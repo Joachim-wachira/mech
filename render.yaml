@@ -1,0 +1,82 @@
+# ============================================================
+# Mech Platform — Render.com Deployment Blueprint (Free Tier)
+# Deploy: Connect repo to Render → Dashboard → "New Blueprint"
+#
+# FIXES APPLIED:
+#   1. dockerfilePath now points to backend/Dockerfile (plain name)
+#   2. scaling section removed — not supported on free/starter tier
+#   3. region removed from static site — not allowed for static services
+#   4. backend kept on starter (cheapest paid); DB on free PostgreSQL
+# ============================================================
+
+services:
+  # ── Backend API + WebSocket ──────────────────────────────────
+  - type: web
+    name: mech-backend
+    runtime: docker
+    # Render requires the file to be literally named "Dockerfile"
+    # Make sure backend/Dockerfile exists (not Dockerfile.dockerfile)
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter           # cheapest paid plan — needed for Docker runtime
+    region: frankfurt
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mech-db
+          property: connectionString
+      - key: SMS_PROVIDER
+        value: stub          # change to 'africastalking' when ready
+      - key: AFRICASTALKING_USERNAME
+        sync: false          # set manually in Render dashboard
+      - key: AFRICASTALKING_API_KEY
+        sync: false          # set manually in Render dashboard
+      - key: SMS_SENDER
+        value: MECH
+      - key: NEARBY_RADIUS_KM
+        value: "25"
+      - key: PORT
+        value: "5000"
+    # ── scaling block intentionally removed ─────────────────
+    # Free/starter plans do not support autoscaling.
+    # Render will error: "targetCPUPercent or targetMemoryPercent required"
+
+  # ── Static Frontend ──────────────────────────────────────────
+  - type: web
+    name: mech-frontend
+    runtime: static
+    staticPublishPath: ./frontend
+    plan: free
+    # ── region intentionally removed ────────────────────────
+    # Render does NOT allow a region field on static sites.
+    # Static sites are served from Render's global CDN automatically.
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+      - path: /css/*
+        name: Cache-Control
+        value: public, max-age=604800
+      - path: /js/*
+        name: Cache-Control
+        value: public, max-age=604800
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+# ── PostgreSQL Database ──────────────────────────────────────
+databases:
+  - name: mech-db
+    databaseName: mech
+    user: mech_admin
+    plan: free              # Render free PostgreSQL — expires after 90 days
+    # ── region removed from DB too for free plan compatibility ──
+    postgresMajorVersion: "16"
