@@ -18,7 +18,7 @@ services:
     # Make sure backend/Dockerfile exists (not Dockerfile.dockerfile)
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    plan: starter           # cheapest paid plan — needed for Docker runtime
+    plan: free
     region: frankfurt
     healthCheckPath: /health
     envVars:
