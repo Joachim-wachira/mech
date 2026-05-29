@@ -3,10 +3,8 @@
 # Deploy: Connect repo to Render → Dashboard → "New Blueprint"
 #
 # FIXES APPLIED:
-#   1. dockerfilePath now points to backend/Dockerfile (plain name)
-#   2. scaling section removed — not supported on free/starter tier
-#   3. region removed from static site — not allowed for static services
-#   4. backend kept on starter (cheapest paid); DB on free PostgreSQL
+#   1. Removed 'plan: free' from mech-frontend (Static sites are free by default; explicit key causes error)
+#   2. Docker backend and Postgres configured to strictly use valid free tier properties.
 # ============================================================
 
 services:
@@ -14,8 +12,6 @@ services:
   - type: web
     name: mech-backend
     runtime: docker
-    # Render requires the file to be literally named "Dockerfile"
-    # Make sure backend/Dockerfile exists (not Dockerfile.dockerfile)
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     plan: free
@@ -44,19 +40,15 @@ services:
         value: "25"
       - key: PORT
         value: "5000"
-    # ── scaling block intentionally removed ─────────────────
-    # Free/starter plans do not support autoscaling.
-    # Render will error: "targetCPUPercent or targetMemoryPercent required"
 
   # ── Static Frontend ──────────────────────────────────────────
   - type: web
     name: mech-frontend
     runtime: static
     staticPublishPath: ./frontend
-    plan: free
-    # ── region intentionally removed ────────────────────────
-    # Render does NOT allow a region field on static sites.
-    # Static sites are served from Render's global CDN automatically.
+    # ── FIXED: 'plan: free' removed from here ──────────────────
+    # Render static sites are free by default. Specifying 'plan: free'
+    # on a static service triggers the validation error you experienced.
     headers:
       - path: /*
         name: Cache-Control
@@ -78,5 +70,4 @@ databases:
     databaseName: mech
     user: mech_admin
     plan: free              # Render free PostgreSQL — expires after 90 days
-    # ── region removed from DB too for free plan compatibility ──
     postgresMajorVersion: "16"
