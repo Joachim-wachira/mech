@@ -7,8 +7,8 @@
 
 /* ── Config ─────────────────────────────────────────────────── */
 const MECH_CONFIG = window.MechConfig || {
-  API_BASE: 'http://localhost:5000',
-  WS_URL:   'http://localhost:5000',
+  API_BASE: 'https://mech-backend.onrender.com',
+  WS_URL:   'wss://mech-backend.onrender.com',
   APP_NAME: 'mech',
 };
 
