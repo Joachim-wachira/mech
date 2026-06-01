@@ -20,7 +20,7 @@ def create_app(config_object=None):
     if config_object:
         app.config.from_object(config_object)
         CORS(app,
-             resources={r"/api/*":{"origins": [https://mech-frontend.onrender.com]}}
+             resources={r"/api/*":{"origins": ["https://mech-frontend.onrender.com"]}},
              supports_credentials=True)
         return app
     else:
