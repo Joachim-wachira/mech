@@ -231,7 +231,7 @@ document.getElementById('driverRegForm').addEventListener('submit', async functi
   btn.disabled    = true;
 
   try {
-    const cfg = window.MechConfig || { API_BASE: 'https://mech-backend.onrender.com' };
+    const cfg = window.MechConfig || { API_BASE: 'https://mech-backend-h7nk.onrender.com' };
     const res = await fetch(`${cfg.API_BASE}/api/auth/register/driver`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
