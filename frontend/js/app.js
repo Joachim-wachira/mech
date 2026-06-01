@@ -7,8 +7,8 @@
 
 /* ── Config ─────────────────────────────────────────────────── */
 const MECH_CONFIG = window.MechConfig || {
-  API_BASE: 'https://mech-backend.onrender.com',
-  WS_URL:   'wss://mech-backend.onrender.com',
+  API_BASE: 'https://mech-backend-h7nk.onrender.com',
+  WS_URL:   'wss://mech-backend-h7nk.onrender.com',
   APP_NAME: 'mech',
 };
 
