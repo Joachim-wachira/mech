@@ -339,7 +339,7 @@ document.getElementById('mechRegForm').addEventListener('submit', async function
   btn.textContent = '⏳ Creating account...'; btn.disabled = true;
 
   try {
-    const cfg = window.MechConfig || { API_BASE:'http://localhost:5000' };
+    const cfg = window.MechConfig || { API_BASE: 'https://mech-backend-h7nk.onrender.com' };
     const res  = await fetch(`${cfg.API_BASE}/api/auth/register/mechanic`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(payload)
