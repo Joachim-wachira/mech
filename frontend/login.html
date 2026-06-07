@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#6b21c8"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="mech"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+  <title>mech — Login</title>
+  <link rel="stylesheet" href="css/styles.css"/>
+  <link rel="icon" type="image/svg+xml" href="logo.SVG"/>
+  <style>
+    .tab-row { display:flex; gap:0; margin-bottom:20px; border-radius:var(--radius-md); overflow:hidden; background:rgba(255,255,255,0.08); }
+    .tab-btn { flex:1; padding:11px; font-size:0.88rem; font-weight:800; border:none; background:transparent; color:rgba(255,255,255,0.55); cursor:pointer; letter-spacing:0.5px; transition:all 0.2s; }
+    .tab-btn.active { background:var(--purple-main); color:#fff; }
+    .view { display:none; }
+    .view.active { display:flex; flex-direction:column; gap:12px; }
+    .alert-msg { padding:10px 14px; border-radius:var(--radius-sm); font-size:0.82rem; font-weight:700; display:none; }
+    .alert-success { background:rgba(16,185,129,0.15); border:1px solid var(--green-btn); color:var(--green-btn); }
+    .alert-error { background:rgba(239,68,68,0.12); border:1px solid var(--red-btn); color:var(--red-btn); }
+  </style>
+</head>
+<body>
+<div class="page-wrapper" style="align-items:center;padding-top:0;">
+  <div style="width:100%;max-width:440px;padding:28px 16px 40px;">
+
+    <!-- Logo -->
+    <div class="logo-block" style="margin-bottom:20px;">
+      <div class="logo-ripple-wrap" style="width:90px;height:90px;">
+        <span class="ripple-ring ripple-ring-1"></span>
+        <span class="ripple-ring ripple-ring-2"></span>
+        <span class="ripple-ring ripple-ring-3"></span>
+        <div class="logo-circle"><img src="logo.SVG" alt="mech"/></div>
+      </div>
+      <span class="logo-name">mech</span>
+      <span class="logo-tagline">The trusted partner for on-demand auto help.</span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="showView('login',this)">Login</button>
+      <button class="tab-btn" onclick="showView('forgot',this)">Forgot Password</button>
+    </div>
+
+    <!-- ── LOGIN VIEW ─────────────────────── -->
+    <div id="view-login" class="view active">
+      <div id="loginAlert" class="alert-msg"></div>
+
+      <div class="input-wrapper">
+        <span class="input-icon">📞</span>
+        <input class="input-field" type="tel" id="loginPhone" placeholder="Phone Number or Email" autocomplete="username"/>
+      </div>
+
+      <div class="input-wrapper">
+        <span class="input-icon">🔒</span>
+        <input class="input-field" type="password" id="loginPw" placeholder="Password" autocomplete="current-password"/>
+        <button type="button" onclick="togglePw('loginPw',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;">👁</button>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:-4px 0 0;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--text-light);cursor:pointer;">
+          <input type="checkbox" id="rememberMe" style="accent-color:var(--purple-main);"/> Remember me
+        </label>
+        <button type="button" onclick="showView('forgot',document.querySelectorAll('.tab-btn')[1])" style="background:none;border:none;color:var(--cyan-accent);font-size:0.8rem;font-weight:700;cursor:pointer;">Forgot password?</button>
+      </div>
+
+      <button class="btn btn-blue btn-full" style="margin-top:4px;padding:15px;font-size:1rem;" onclick="handleLogin()">
+        Login
+      </button>
+
+      <div style="text-align:center;color:var(--text-light);font-size:0.85rem;margin-top:4px;">
+        Don't have an account?
+        <a href="index.html" style="color:var(--cyan-accent);font-weight:700;">Register here</a>
+      </div>
+    </div>
+
+    <!-- ── FORGOT PASSWORD VIEW ────────────── -->
+    <div id="view-forgot" class="view">
+      <div id="forgotAlert" class="alert-msg"></div>
+
+      <p style="color:var(--text-light);font-size:0.88rem;line-height:1.6;margin-bottom:4px;">
+        Enter your registered phone number or email. We'll send you a code to reset your password.
+      </p>
+
+      <div class="input-wrapper">
+        <span class="input-icon">📞</span>
+        <input class="input-field" type="text" id="resetIdentifier" placeholder="Phone Number or Email"/>
+      </div>
+
+      <button class="btn btn-blue btn-full" style="padding:14px;" onclick="handleForgot()">
+        Send Reset Code
+      </button>
+
+      <!-- OTP step (hidden initially) -->
+      <div id="otpStep" style="display:none;flex-direction:column;gap:12px;margin-top:4px;">
+        <div class="input-wrapper">
+          <span class="input-icon">🔢</span>
+          <input class="input-field" type="text" id="otpCode" placeholder="Enter 6-digit code" maxlength="6"/>
+        </div>
+        <div class="input-wrapper">
+          <span class="input-icon">🔒</span>
+          <input class="input-field" type="password" id="newPw" placeholder="New Password" id="newPwField"/>
+          <button type="button" onclick="togglePw('newPwField',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;">👁</button>
+        </div>
+        <div class="input-wrapper">
+          <span class="input-icon">🔒</span>
+          <input class="input-field" type="password" id="confirmPw" placeholder="Confirm New Password"/>
+        </div>
+        <button class="btn btn-green btn-full" style="padding:14px;" onclick="handleResetPassword()">
+          Reset Password
+        </button>
+      </div>
+
+      <button type="button" onclick="showView('login',document.querySelectorAll('.tab-btn')[0])" style="background:none;border:none;color:var(--cyan-accent);font-size:0.82rem;font-weight:700;cursor:pointer;margin-top:4px;text-align:center;width:100%;">
+        ← Back to Login
+      </button>
+    </div>
+
+    <p style="text-align:center;margin-top:16px;">
+      <a href="index.html" style="color:rgba(255,255,255,0.4);font-size:0.78rem;">← Back to Home</a>
+    </p>
+  </div>
+
+  <footer class="page-footer">© <span id="yr"></span> mech. All rights reserved.</footer>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+function showView(name, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+function togglePw(id, btn) {
+  const f = document.getElementById(id);
+  if (!f) return;
+  f.type = f.type === 'password' ? 'text' : 'password';
+  btn.textContent = f.type === 'password' ? '👁' : '🙈';
+}
+
+function showAlert(id, msg, type) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'alert-msg alert-' + type;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+
+async function handleLogin() {
+  const identifier = document.getElementById('loginPhone').value.trim();
+  const password   = document.getElementById('loginPw').value;
+  if (!identifier || !password) return showAlert('loginAlert','Please fill in all fields','error');
+
+  try {
+    const res = await fetch(`${(window.MechConfig||{API_BASE:'https://mech-backend-h7nk.onrender.com'}).API_BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ identifier, password })
+    });
+    const data = await res.json();
+    if (data.token) {
+      localStorage.setItem('mech_token', JSON.stringify(data.token));
+      localStorage.setItem('mech_user', JSON.stringify(data.user));
+      localStorage.setItem('mech_role', JSON.stringify(data.role));
+      const dashMap = { driver:'dashboard_driver.html', mechanic:'dashboard_mechanic.html', spareshop:'dashboard_spareshop.html', admin:'dashboard_admin.html' };
+      window.location.href = dashMap[data.role] || 'dashboard_driver.html';
+    } else {
+      showAlert('loginAlert', data.message || 'Invalid credentials', 'error');
+    }
+  } catch(e) {
+    showAlert('loginAlert','Network error — please try again','error');
+  }
+}
+
+async function handleForgot() {
+  const identifier = document.getElementById('resetIdentifier').value.trim();
+  if (!identifier) return showAlert('forgotAlert','Please enter your phone number or email','error');
+  try {
+    const res = await fetch(`${(window.MechConfig||{API_BASE:'https://mech-backend-h7nk.onrender.com'}).API_BASE}/api/auth/forgot-password`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({identifier})
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showAlert('forgotAlert','Reset code sent! Check your phone or email.','success');
+      document.getElementById('otpStep').style.display = 'flex';
+    } else {
+      showAlert('forgotAlert', data.message || 'Could not find that account','error');
+    }
+  } catch(e) {
+    showAlert('forgotAlert','Network error — please try again','error');
+  }
+}
+
+async function handleResetPassword() {
+  const code = document.getElementById('otpCode').value.trim();
+  const pw   = document.getElementById('newPw').value;
+  const cpw  = document.getElementById('confirmPw').value;
+  if (!code || !pw || !cpw) return showAlert('forgotAlert','Please fill all fields','error');
+  if (pw !== cpw) return showAlert('forgotAlert','Passwords do not match','error');
+  if (pw.length < 8) return showAlert('forgotAlert','Password must be at least 8 characters','error');
+  try {
+    const res = await fetch(`${(window.MechConfig||{API_BASE:'https://mech-backend-h7nk.onrender.com'}).API_BASE}/api/auth/reset-password`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ identifier: document.getElementById('resetIdentifier').value.trim(), code, new_password: pw })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showAlert('forgotAlert','Password reset! You can now login.','success');
+      setTimeout(() => showView('login', document.querySelectorAll('.tab-btn')[0]), 2000);
+    } else {
+      showAlert('forgotAlert', data.message || 'Invalid code','error');
+    }
+  } catch(e) {
+    showAlert('forgotAlert','Network error','error');
+  }
+}
+
+// Enter key on login
+document.getElementById('loginPw').addEventListener('keydown', e => { if(e.key==='Enter') handleLogin(); });
+</script>
+</body>
+</html>

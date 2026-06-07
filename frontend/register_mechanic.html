@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#6b21c8"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="mech"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+  <title>mech — Mechanic Registration</title>
+  <link rel="stylesheet" href="css/styles.css"/>
+  <link rel="icon" type="image/svg+xml" href="logo.SVG"/>
+  <style>
+    .terms-check-block {
+      background: rgba(255,255,255,0.07);
+      border: 1.5px solid rgba(255,255,255,0.18);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .terms-check-block input[type="checkbox"] {
+      width: 20px; height: 20px;
+      accent-color: #7c3aed;
+      flex-shrink: 0; margin-top: 2px; cursor: pointer;
+    }
+    .terms-check-block label {
+      font-size: 0.84rem; color: rgba(255,255,255,0.85); line-height: 1.55; cursor: pointer;
+    }
+    .terms-check-block a { color: #22d3ee; font-weight: 700; text-decoration: underline; }
+    .terms-error { font-size:0.78rem; color:#fca5a5; font-weight:700; display:none; padding:4px 2px; }
+    .alert-msg { padding:10px 14px; border-radius:10px; font-size:0.82rem; font-weight:700; display:none; margin-bottom:4px; }
+    .alert-error   { background:rgba(239,68,68,0.12);  border:1px solid #dc2626; color:#fca5a5; }
+    .alert-success { background:rgba(16,185,129,0.12); border:1px solid #16a34a; color:#6ee7b7; }
+  </style>
+</head>
+<body>
+<div class="page-wrapper" style="align-items:center;">
+  <div style="width:100%;max-width:480px;padding:20px 0 90px;">
+
+    <!-- Logo -->
+    <div class="logo-block">
+      <div class="logo-ripple-wrap" style="width:90px;height:90px;">
+        <span class="ripple-ring ripple-ring-1"></span>
+        <span class="ripple-ring ripple-ring-2"></span>
+        <span class="ripple-ring ripple-ring-3"></span>
+        <div class="logo-circle"><img src="logo.SVG" alt="mech"/></div>
+      </div>
+    </div>
+
+    <h2 class="section-title" style="font-size:1.8rem;">Mechanic Registration</h2>
+    <p style="text-align:center;color:var(--text-light);font-size:0.85rem;margin-bottom:4px;">On-demand automotive help, anywhere in the world.</p>
+    <h3 style="text-align:center;color:var(--text-white);font-size:1.1rem;font-weight:800;margin-bottom:18px;">Service Provider Registration</h3>
+
+    <div id="regAlert" class="alert-msg"></div>
+
+    <form id="mechRegForm" style="display:flex;flex-direction:column;gap:11px;" novalidate>
+
+      <div class="input-wrapper">
+        <span class="input-icon">👤</span>
+        <input class="input-field" type="text" name="full_name" placeholder="Full Name" required/>
+      </div>
+
+      <div class="input-wrapper">
+        <span class="input-icon">🏢</span>
+        <input class="input-field" type="text" name="business_name" placeholder="Business / Workshop Name (Optional)"/>
+      </div>
+
+      <!-- Country -->
+      <div class="input-wrapper">
+        <span class="input-icon">🌍</span>
+        <input class="input-field" type="text" name="country" id="countryInput" placeholder="Country" required/>
+      </div>
+
+      <div class="input-wrapper">
+        <span class="input-icon">📍</span>
+        <input class="input-field" type="text" name="location_text" id="locationText" placeholder="City / Town / Address"/>
+        <button type="button" id="detectLocBtn" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;">🔍</button>
+      </div>
+
+      <!-- Verify Identity -->
+      <p class="form-section-title">Verify Identity</p>
+      <div class="form-row">
+        <label class="upload-btn" style="flex:1;cursor:pointer;">
+          <input type="file" hidden name="id_doc" accept="image/*,.pdf"/>
+          ⬆️ Upload ID Document
+        </label>
+        <label class="upload-btn" style="flex:1;cursor:pointer;">
+          <input type="file" hidden name="cert_doc" accept="image/*,.pdf"/>
+          📄 Upload Certificate
+        </label>
+      </div>
+      <p class="verify-note">Verification badge awarded after review — valid worldwide. ⚙️</p>
+
+      <!-- Phone Auth -->
+      <p class="form-section-title">Authenticate Phone Number</p>
+      <div class="sms-row">
+        <div class="input-wrapper" style="flex:1;">
+          <span class="input-icon">📞</span>
+          <input class="input-field" type="tel" name="phone" id="phoneInput" placeholder="Phone (with country code)" required/>
+        </div>
+        <button type="button" id="sendSmsBtn" class="btn btn-blue" style="white-space:nowrap;padding:12px 14px;font-size:0.82rem;">Send SMS Code</button>
+      </div>
+      <div class="sms-row">
+        <div class="input-wrapper" style="flex:1;">
+          <span class="input-icon">🔢</span>
+          <input class="input-field" type="text" name="sms_code" id="smsCode" placeholder="SMS Verification Code"/>
+        </div>
+        <button type="button" id="verifySmsBtn" class="btn btn-gray" style="white-space:nowrap;padding:12px 14px;font-size:0.82rem;">Verify Code</button>
+      </div>
+
+      <!-- Mechanic Specialization -->
+      <p class="form-section-title">Mechanic Specialization</p>
+      <div class="specialization-grid">
+        <div>
+          <p class="form-section-title" style="font-size:0.78rem;margin:0 0 6px;">Select Vehicle Brands</p>
+          <div class="spec-panel">
+            <div style="position:relative;">
+              <input type="text" id="brandSearch" class="spec-search" placeholder="🔍 Search brands"/>
+            </div>
+            <div class="brand-list">
+              <label class="spec-item"><input type="checkbox" name="brand" value="toyota"/> 🚗 Toyota</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="volkswagen"/> 🚗 Volkswagen</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="mercedes"/> 🚗 Mercedes</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="bmw"/> 🚗 BMW</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="nissan"/> 🚗 Nissan</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="honda"/> 🚗 Honda</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="ford"/> 🚗 Ford</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="hyundai"/> 🚗 Hyundai</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="kia"/> 🚗 Kia</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="peugeot"/> 🚗 Peugeot</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="renault"/> 🚗 Renault</label>
+              <label class="spec-item"><input type="checkbox" name="brand" value="other"/> 🚗 Other / All</label>
+            </div>
+          </div>
+        </div>
+        <div>
+          <p class="form-section-title" style="font-size:0.78rem;margin:0 0 6px;">Select Services</p>
+          <div class="spec-panel">
+            <div class="service-list">
+              <label class="spec-item"><input type="checkbox" name="service" value="painting"/> 🎨 Painting</label>
+              <label class="spec-item"><input type="checkbox" name="service" value="wiring"/> ⚡ Wiring</label>
+              <label class="spec-item"><input type="checkbox" name="service" value="mechanics"/> 🔧 General Mechanics</label>
+              <label class="spec-item"><input type="checkbox" name="service" value="towing"/> 🚛 Towing</label>
+              <label class="spec-item"><input type="checkbox" name="service" value="tyres"/> 🔄 Tyres</label>
+              <label class="spec-item"><input type="checkbox" name="service" value="diagnostics"/> 🖥️ Diagnostics</label>
+              <label class="spec-item"><input type="checkbox" name="service" value="ac"/> ❄️ AC Repair</label>
+              <label class="spec-item"><input type="checkbox" name="service" value="brakes"/> 🛑 Brakes</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Password & Email -->
+      <div class="input-wrapper" style="margin-top:8px;">
+        <span class="input-icon">🔒</span>
+        <input class="input-field" type="password" name="password" placeholder="Create Password (min 8 chars)" required id="mechPw"/>
+        <button type="button" onclick="togglePw('mechPw',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;">👁</button>
+      </div>
+
+      <div class="input-wrapper">
+        <span class="input-icon">✉️</span>
+        <input class="input-field" type="email" name="email" placeholder="Email Address" required/>
+      </div>
+
+      <!-- ── Terms & Conditions ──────────────────────────────── -->
+      <div class="terms-check-block">
+        <input type="checkbox" id="termsAccept" name="terms_accepted"/>
+        <label for="termsAccept">
+          I have read and agree to the
+          <a href="terms.html" target="_blank" rel="noopener">Terms &amp; Conditions</a>
+          and
+          <a href="terms.html#privacy" target="_blank" rel="noopener">Privacy Policy</a>.
+          I confirm I am at least 18 years old and that my details and documents are genuine.
+          I understand verification is required before being listed as a provider.
+        </label>
+      </div>
+      <div id="termsError" class="terms-error">⚠️ You must accept the Terms &amp; Conditions to create an account.</div>
+      <!-- ────────────────────────────────────────────────────── -->
+
+      <button type="submit" class="btn btn-blue btn-full" style="margin-top:8px;padding:15px;">
+        Create Account
+      </button>
+
+      <!-- Social proof -->
+      <div style="background:rgba(255,255,255,0.9);border-radius:var(--radius-md);padding:12px;display:flex;gap:10px;align-items:center;margin-top:6px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--magenta),var(--cyan-accent));display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;">🔧</div>
+        <div>
+          <div style="font-size:0.72rem;font-weight:800;color:var(--text-purple);">✅ Verified Mechanic — Worldwide Platform</div>
+          <div style="color:#f59e0b;font-size:0.72rem;">★★★★★</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);">Join thousands of mechanics helping drivers globally</div>
+        </div>
+      </div>
+    </form>
+
+    <p style="text-align:center;margin-top:14px;color:var(--text-light);font-size:0.82rem;">
+      Already have an account?
+      <a href="login.html" style="color:var(--cyan-accent);font-weight:700;">Login here</a>
+    </p>
+    <p style="text-align:center;margin-top:6px;">
+      <a href="index.html" style="color:rgba(255,255,255,0.4);font-size:0.78rem;">← Back to Home</a>
+    </p>
+  </div>
+
+  <footer class="page-footer">© <span id="yr"></span> mech. All rights reserved.</footer>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+function togglePw(id, btn) {
+  const f = document.getElementById(id);
+  f.type  = f.type === 'password' ? 'text' : 'password';
+  btn.textContent = f.type === 'password' ? '👁' : '🙈';
+}
+
+function showAlert(msg, type) {
+  const el = document.getElementById('regAlert');
+  el.textContent   = msg;
+  el.className     = 'alert-msg alert-' + type;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  if (type === 'success') return;
+  setTimeout(() => el.style.display = 'none', 5000);
+}
+
+// Auto-fill country
+try {
+  const region = (navigator.language||'').split('-')[1];
+  if (region) {
+    const name = new Intl.DisplayNames(['en'],{type:'region'}).of(region);
+    if (name) document.getElementById('countryInput').value = name;
+  }
+} catch(e) {}
+
+// Location detect
+document.getElementById('detectLocBtn').addEventListener('click', function() {
+  this.textContent = '⏳';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`)
+        .then(r=>r.json()).then(d => {
+          const a = d.address||{};
+          document.getElementById('locationText').value =
+            [a.city||a.town||a.village||a.county, a.state, a.country].filter(Boolean).join(', ');
+          if (a.country) document.getElementById('countryInput').value = a.country;
+          this.textContent = '✓';
+        }).catch(()=>{ this.textContent='🔍'; });
+    },
+    () => { this.textContent = '🔍'; }
+  );
+});
+
+// Brand search
+document.getElementById('brandSearch')?.addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.brand-list .spec-item').forEach(el => {
+    el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+
+// SMS
+let smsVerified = false;
+document.getElementById('sendSmsBtn').addEventListener('click', async function() {
+  const phone = document.getElementById('phoneInput').value.trim();
+  if (!phone) return showAlert('Enter your phone number first.', 'error');
+  this.textContent = '⏳ Sending...'; this.disabled = true;
+  const cfg = window.MechConfig || { API_BASE:'https://mech-backend-h7nk.onrender.com' };
+  const res = await fetch(`${cfg.API_BASE}/api/auth/send-sms`,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({phone})
+  }).catch(()=>null);
+  this.textContent = res?.ok ? 'Resend Code' : 'Send SMS Code';
+  this.disabled = false;
+  if (res?.ok) showAlert('SMS code sent!', 'success');
+});
+
+document.getElementById('verifySmsBtn').addEventListener('click', async function() {
+  const phone = document.getElementById('phoneInput').value.trim();
+  const code  = document.getElementById('smsCode').value.trim();
+  if (!phone || !code) return showAlert('Enter phone and code.', 'error');
+  const cfg = window.MechConfig || { API_BASE:'https://mech-backend-h7nk.onrender.com' };
+  const res = await fetch(`${cfg.API_BASE}/api/auth/verify-sms`,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({phone, code})
+  }).catch(()=>null);
+  const data = await res?.json().catch(()=>({}));
+  if (data?.verified) {
+    smsVerified = true;
+    this.textContent = '✅ Verified';
+    this.className   = 'btn btn-green';
+    this.disabled    = true;
+  } else {
+    showAlert(data?.error || 'Invalid code.', 'error');
+  }
+});
+
+// Terms
+document.getElementById('termsAccept').addEventListener('change', function() {
+  document.getElementById('termsError').style.display = this.checked ? 'none' : 'block';
+});
+
+// Submit
+document.getElementById('mechRegForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  if (!document.getElementById('termsAccept').checked) {
+    document.getElementById('termsError').style.display = 'block';
+    document.getElementById('termsAccept').focus();
+    return;
+  }
+  document.getElementById('termsError').style.display = 'none';
+
+  const fd = new FormData(this);
+  const brands   = [...document.querySelectorAll('input[name="brand"]:checked')].map(i=>i.value);
+  const services = [...document.querySelectorAll('input[name="service"]:checked')].map(i=>i.value);
+  const payload  = {
+    full_name:      fd.get('full_name'),
+    business_name:  fd.get('business_name') || '',
+    phone:          fd.get('phone'),
+    email:          fd.get('email'),
+    password:       fd.get('password'),
+    country:        fd.get('country') || '',
+    location_text:  fd.get('location_text') || '',
+    vehicle_brands: brands,
+    services,
+    terms_accepted: document.getElementById('termsAccept').checked, // ✅ FIX: send boolean, not "on"
+  };
+
+  if (!payload.full_name || !payload.phone || !payload.email || !payload.password)
+    return showAlert('Please fill in all required fields.', 'error');
+  if (payload.password.length < 8)
+    return showAlert('Password must be at least 8 characters.', 'error');
+
+  const btn = this.querySelector('[type="submit"]');
+  btn.textContent = '⏳ Creating account...'; btn.disabled = true;
+
+  try {
+    const cfg = window.MechConfig || { API_BASE: 'https://mech-backend-h7nk.onrender.com' };
+    const res  = await fetch(`${cfg.API_BASE}/api/auth/register/mechanic`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    let data = {};
+    try { data = await res.json(); } catch(_) {}
+    if (res.ok && data.token) {
+      localStorage.setItem('mech_token', JSON.stringify(data.token));
+      localStorage.setItem('mech_user',  JSON.stringify(data.user));
+      localStorage.setItem('mech_role',  JSON.stringify(data.role));
+      showAlert('Account created! Redirecting...', 'success');
+      setTimeout(() => window.location.href = 'dashboard_mechanic.html', 1200);
+    } else {
+      showAlert(data.error || data.message || `Server error (${res.status}) — please try again.`, 'error');
+      btn.textContent = 'Create Account'; btn.disabled = false;
+    }
+  } catch(err) {
+    showAlert('Connection failed — check your internet and try again.', 'error');
+    btn.textContent = 'Create Account'; btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

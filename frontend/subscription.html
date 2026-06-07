@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="theme-color" content="#0d0f12"/>
+<title>Mech — My Subscription</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="stylesheet" href="css/styles.css"/>
+<style>
+  body { background: var(--bg-dark, #0d0f12); color: #f3f4f6; font-family: 'Outfit', sans-serif; margin: 0; }
+
+  .page-wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 100px; }
+
+  .page-header { text-align: center; padding: 32px 0 24px; }
+  .page-header h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 6px; }
+  .page-header p  { font-size: 0.85rem; color: #9ca3af; margin: 0; }
+
+  /* Status card */
+  .status-card {
+    border-radius: 18px;
+    padding: 24px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .status-card.active   { background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); border: 1px solid #10b981; }
+  .status-card.grace    { background: linear-gradient(135deg, #451a03 0%, #78350f 100%); border: 1px solid #f59e0b; }
+  .status-card.pending  { background: linear-gradient(135deg, #1e1b4b 0%, #1e3a5f 100%); border: 1px solid #6366f1; }
+  .status-card.unpaid   { background: linear-gradient(135deg, #1f1f2e 0%, #27272a 100%); border: 1px solid #374151; }
+  .status-card.expired,
+  .status-card.suspended{ background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%); border: 1px solid #ef4444; }
+
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 4px 12px; border-radius: 100px;
+    margin-bottom: 14px;
+  }
+  .badge-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .active .badge-dot   { background: #10b981; box-shadow: 0 0 6px #10b981; }
+  .grace  .badge-dot   { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+  .pending .badge-dot  { background: #818cf8; box-shadow: 0 0 6px #818cf8; }
+  .unpaid .badge-dot   { background: #6b7280; }
+  .expired .badge-dot,
+  .suspended .badge-dot{ background: #ef4444; }
+
+  .status-big   { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+  .status-sub   { font-size: 0.8rem; opacity: 0.7; margin-bottom: 16px; }
+  .expires-bar  { background: rgba(255,255,255,0.08); border-radius: 8px; height: 6px; overflow: hidden; margin-top: 12px; }
+  .expires-fill { height: 100%; border-radius: 8px; background: #10b981; transition: width 0.5s; }
+
+  /* Plan cards */
+  .plans-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+  .plan-card {
+    border-radius: 14px; padding: 16px 12px; cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    transition: all 0.2s; text-align: center; position: relative;
+  }
+  .plan-card:hover  { border-color: rgba(255,255,255,0.3); }
+  .plan-card.selected { border-color: #f97316; background: rgba(249,115,22,0.1); }
+  .plan-card .best-val {
+    position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    background: #f97316; color: white; font-size: 0.62rem; font-weight: 800;
+    padding: 2px 8px; border-radius: 100px; letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .plan-label  { font-size: 0.72rem; color: #9ca3af; margin-bottom: 4px; }
+  .plan-price  { font-size: 1.2rem; font-weight: 800; }
+  .plan-price span { font-size: 0.7rem; font-weight: 400; color: #9ca3af; }
+  .plan-save   { font-size: 0.65rem; color: #10b981; margin-top: 3px; font-weight: 600; }
+
+  /* Form */
+  .form-section { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+  .form-label { font-size: 0.75rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; display: block; }
+  .input-field {
+    width: 100%; box-sizing: border-box;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px; padding: 12px 14px; color: #fff; font-size: 0.9rem;
+    outline: none; font-family: inherit; margin-bottom: 12px;
+    transition: border-color 0.2s;
+  }
+  .input-field:focus { border-color: #f97316; }
+
+  .btn-submit {
+    width: 100%; padding: 15px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, #ea580c, #f97316);
+    color: white; font-size: 1rem; font-weight: 700; cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Alert */
+  .alert { border-radius: 10px; padding: 12px 16px; font-size: 0.85rem; font-weight: 600; margin-bottom: 14px; display: none; }
+  .alert.success { background: rgba(16,185,129,0.15); border: 1px solid #10b981; color: #6ee7b7; }
+  .alert.error   { background: rgba(239,68,68,0.15);  border: 1px solid #ef4444; color: #fca5a5; }
+
+  .instructions { font-size: 0.8rem; color: #9ca3af; line-height: 1.6; }
+  .instructions strong { color: #f3f4f6; }
+  .paybill-box {
+    background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.4);
+    border-radius: 10px; padding: 14px 16px; margin: 12px 0; text-align: center;
+  }
+  .paybill-num { font-size: 1.8rem; font-weight: 800; color: #f97316; letter-spacing: 0.05em; }
+  .paybill-sub { font-size: 0.72rem; color: #9ca3af; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div class="page-header">
+    <h1>🔑 My Subscription</h1>
+    <p>Subscription required to be listed on Mech</p>
+  </div>
+
+  <!-- Status card (populated by JS) -->
+  <div id="statusCard" class="status-card unpaid">
+    <div id="statusBadge" class="status-badge"><span class="badge-dot"></span><span id="statusLabel">Loading…</span></div>
+    <div id="statusBig"  class="status-big">—</div>
+    <div id="statusSub"  class="status-sub">—</div>
+    <div id="expiresBar" class="expires-bar" style="display:none;">
+      <div id="expiresFill" class="expires-fill" style="width:100%;"></div>
+    </div>
+  </div>
+
+  <div id="alertBox" class="alert"></div>
+
+  <!-- Payment form (hidden when active) -->
+  <div id="paymentSection">
+    <div class="plans-grid">
+      <div class="plan-card" data-plan="monthly" onclick="selectPlan(this)">
+        <div class="plan-label">Monthly</div>
+        <div class="plan-price">KES <span>999</span></div>
+      </div>
+      <div class="plan-card selected" data-plan="annual" onclick="selectPlan(this)">
+        <div class="best-val">BEST VALUE</div>
+        <div class="plan-label">1 Year</div>
+        <div class="plan-price">KES <span>9,999</span></div>
+        <div class="plan-save">Save 17%</div>
+      </div>
+      <div class="plan-card" data-plan="biennial" onclick="selectPlan(this)">
+        <div class="plan-label">5 Years</div>
+        <div class="plan-price">KES <span>39,999</span></div>
+        <div class="plan-save">Save 33%</div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="instructions">
+        Pay via M-Pesa to the Mech Platform Paybill:
+        <div class="paybill-box">
+          <div class="paybill-num">522522</div>
+          <div class="paybill-sub">Account number: your phone number</div>
+        </div>
+        After payment, enter your <strong>M-Pesa transaction code</strong> below and submit.
+        An admin will verify and activate your account within 24 hours.
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">M-Pesa Transaction Code</label>
+      <input class="input-field" type="text" id="paymentRef" placeholder="e.g. QGJ4HKXXXX" autocomplete="off" style="text-transform:uppercase;"/>
+
+      <label class="form-label">Payment Method</label>
+      <select class="input-field" id="paymentMethod">
+        <option value="mpesa">M-Pesa</option>
+        <option value="bank">Bank Transfer</option>
+        <option value="manual">Other / Manual</option>
+      </select>
+
+      <button class="btn-submit" id="submitBtn" onclick="submitPayment()">
+        Submit Payment for Review
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="js/app.js"></script>
+<script>
+const cfg = window.MechConfig || { API_BASE: 'https://mech-backend-h7nk.onrender.com' };
+
+function authHeaders() {
+  const raw = localStorage.getItem('mech_token');
+  const tok = raw ? JSON.parse(raw) : null;
+  return tok
+    ? { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }
+    : { 'Content-Type': 'application/json' };
+}
+
+function showAlert(msg, type='error') {
+  const el = document.getElementById('alertBox');
+  el.textContent = msg;
+  el.className = 'alert ' + type;
+  el.style.display = 'block';
+  if (type === 'success') setTimeout(() => el.style.display = 'none', 5000);
+}
+
+function selectPlan(el) {
+  document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function loadSubscription() {
+  try {
+    const res  = await fetch(cfg.API_BASE + '/api/subscriptions/my', { headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) { showAlert(data.error || 'Could not load subscription.'); return; }
+
+    const sub = data.data.subscription;
+    renderStatus(sub);
+  } catch(e) {
+    showAlert('Network error loading subscription.');
+  }
+}
+
+function renderStatus(sub) {
+  const card    = document.getElementById('statusCard');
+  const badge   = document.getElementById('statusBadge');
+  const bigEl   = document.getElementById('statusBig');
+  const subEl   = document.getElementById('statusSub');
+  const section = document.getElementById('paymentSection');
+  const bar     = document.getElementById('expiresBar');
+
+  // Set card colour
+  card.className = 'status-card ' + sub.status;
+
+  const labels = {
+    active:                '✅ Active',
+    grace:                 '⏳ Grace Period',
+    pending_verification:  '🔍 Under Review',
+    unpaid:                '💳 Payment Required',
+    expired:               '❌ Expired',
+    suspended:             '🔒 Suspended',
+  };
+
+  document.getElementById('statusLabel').textContent = labels[sub.status] || sub.status;
+
+  if (sub.status === 'active') {
+    bigEl.textContent = `${sub.days_remaining} days remaining`;
+    subEl.textContent = `${sub.plan.charAt(0).toUpperCase()+sub.plan.slice(1)} plan · Expires ${new Date(sub.expires_at).toLocaleDateString('en-KE', {day:'numeric', month:'short', year:'numeric'})}`;
+    section.style.display = 'none';
+    bar.style.display = 'block';
+    const pct = Math.min(100, Math.round((sub.days_remaining / (sub.plan==='biennial'?1825:sub.plan==='annual'?365:30)) * 100));
+    document.getElementById('expiresFill').style.width = pct + '%';
+    document.getElementById('expiresFill').style.background = pct < 15 ? '#ef4444' : pct < 30 ? '#f59e0b' : '#10b981';
+  } else if (sub.status === 'grace') {
+    const graceDate = new Date(sub.grace_until).toLocaleDateString('en-KE', {day:'numeric', month:'short', year:'numeric'});
+    bigEl.textContent = 'Free grace period active';
+    subEl.textContent = `Expires ${graceDate} — please renew before then`;
+    section.style.display = 'block';
+  } else if (sub.status === 'pending_verification') {
+    bigEl.textContent = 'Payment under review';
+    subEl.textContent = 'An admin will verify your payment within 24 hours. You will receive a notification once confirmed.';
+    section.style.display = 'none';
+  } else if (sub.status === 'suspended') {
+    bigEl.textContent = 'Account suspended';
+    subEl.textContent = 'Your subscription has expired and account is suspended. Please renew to regain access.';
+    section.style.display = 'block';
+  } else {
+    bigEl.textContent = 'No active subscription';
+    subEl.textContent = 'Choose a plan and submit your M-Pesa payment to get started.';
+    section.style.display = 'block';
+  }
+}
+
+async function submitPayment() {
+  const plan   = document.querySelector('.plan-card.selected')?.dataset.plan || 'monthly';
+  const ref    = document.getElementById('paymentRef').value.trim().toUpperCase();
+  const method = document.getElementById('paymentMethod').value;
+
+  if (!ref) { showAlert('Please enter your M-Pesa transaction code.'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.textContent = '⏳ Submitting…';
+  btn.disabled = true;
+
+  try {
+    const res  = await fetch(cfg.API_BASE + '/api/subscriptions/submit', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ plan, payment_ref: ref, payment_method: method })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showAlert('✅ Payment submitted! An admin will review and activate your account within 24 hours.', 'success');
+      setTimeout(loadSubscription, 2000);
+    } else {
+      showAlert(data.error || 'Submission failed.');
+    }
+  } catch(e) {
+    showAlert('Network error — please try again.');
+  }
+
+  btn.textContent = 'Submit Payment for Review';
+  btn.disabled = false;
+}
+
+// Load on page ready
+document.addEventListener('DOMContentLoaded', loadSubscription);
+</script>
+</body>
+</html>
