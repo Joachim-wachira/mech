@@ -14,7 +14,13 @@ services:
     plan: free
     healthCheckPath: /health
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --worker-class gevent --workers 1 --bind 0.0.0.0:$PORT --timeout 120 --keep-alive 5 wsgi:application
+    # --preload: loads the app in the master process before forking workers.
+    # Without this, Render's port scanner times out waiting for the gevent worker
+    # to finish booting — the master binds the port but workers aren't ready to
+    # accept connections until create_app() completes (~1-2s). With --preload,
+    # workers fork from an already-initialised app and serve requests instantly.
+    # Safe here because we make zero DB connections at startup (all lazy).
+    startCommand: gunicorn --worker-class gevent --workers 1 --bind 0.0.0.0:$PORT --timeout 120 --keep-alive 5 --preload wsgi:application
 
     envVars:
       - key: PYTHON_VERSION
