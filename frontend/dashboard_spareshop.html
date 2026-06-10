@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#6b21c8"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="mech"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+  <title>mech — Spare Shop Dashboard</title>
+  <link rel="stylesheet" href="css/styles.css"/>
+  <link rel="icon" type="image/svg+xml" href="logo.SVG"/>
+  <style>
+    .rating-lock-note {
+      font-size:0.68rem; color:#9ca3af; font-style:italic;
+      display:flex; align-items:center; gap:4px; margin-top:4px;
+    }
+    .star-bar { display:flex; align-items:center; gap:4px; margin-bottom:3px; }
+    .star-bar-label { font-size:0.7rem; color:#6b7280; width:18px; }
+    .star-bar-track { flex:1; height:5px; background:#e5e7eb; border-radius:99px; overflow:hidden; }
+    .star-bar-fill  { height:100%; background:#f59e0b; border-radius:99px; }
+    .star-bar-count { font-size:0.7rem; color:#6b7280; width:22px; text-align:right; }
+  </style>
+</head>
+<body>
+<div class="page-wrapper has-bottom-nav">
+
+  <!-- Header -->
+  <div class="logo-block" style="padding:16px 0 8px;">
+    <div class="logo-ripple-wrap" style="width:70px;height:70px;">
+      <span class="ripple-ring ripple-ring-1"></span>
+      <span class="ripple-ring ripple-ring-2"></span>
+      <span class="ripple-ring ripple-ring-3"></span>
+      <div class="logo-circle" style="width:70px;height:70px;">
+        <img src="logo.SVG" alt="mech" style="width:54px;height:54px;"/>
+      </div>
+    </div>
+    <span class="logo-name" style="font-size:1.4rem;">mech</span>
+    <h2 style="font-family:var(--font-display);font-size:1.5rem;font-weight:900;color:var(--text-white);">Spare Shop Dashboard</h2>
+    <div style="font-size:0.82rem;color:rgba(255,255,255,0.7);margin-top:4px;">Welcome, <span id="dashUserName">...</span></div>
+  </div>
+
+  <!-- Top Stats -->
+  <div class="dash-grid-3" style="margin-bottom:12px;">
+
+    <div class="stat-widget">
+      <div class="stat-label">SPARES REQUESTED <span class="stat-dot"></span></div>
+      <div class="stat-value">28</div>
+      <button class="stat-link" style="font-size:0.72rem;">View All Requests</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <label class="toggle-switch"><input type="checkbox" checked/><span class="toggle-slider"></span></label>
+        <span style="font-size:1rem;color:var(--text-muted);">📞</span>
+        <span style="font-size:0.7rem;font-weight:700;color:var(--text-muted);margin-left:auto;">Filter by Part 🔻</span>
+      </div>
+    </div>
+
+    <div class="stat-widget">
+      <div class="stat-label">ACTIVE EARNINGS</div>
+      <div class="stat-value kes">KES 15,300</div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;">
+        <span style="font-size:0.72rem;color:var(--text-muted);">Total Payouts</span>
+        <span style="font-size:0.72rem;color:var(--green-btn);font-weight:700;">This Week +12%</span>
+      </div>
+    </div>
+
+    <div class="stat-widget">
+      <div class="stat-label">PENDING DELIVERIES</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <span style="font-size:1.4rem;">🚚</span>
+        <div>
+          <div style="font-size:0.78rem;font-weight:700;">Part: Oil Filter</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">Customer: John Doe</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:6px;">
+          <span style="font-size:1rem;cursor:pointer;" onclick="window.location.href='chat.html?user=cust1'">💬</span>
+          <span style="font-size:1rem;cursor:pointer;" onclick="MechApp?.WS?.initiateCall('cust1')">📞</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main 3-column grid -->
+  <div class="dash-grid-3">
+
+    <!-- LEFT -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Incoming Spare Orders -->
+      <div class="job-card">
+        <div id="orderRequestsList"><div class="job-card-header">
+          <span class="job-card-title">INCOMING SPARE ORDERS</span>
+        </div>
+        <div class="map-thumb"><span class="map-pin">📍</span></div>
+        <div style="font-size:0.78rem;color:var(--text-dark);">
+          <div style="font-weight:700;">Vehicle Type</div>
+          <div style="color:var(--text-muted);">Part: Brake Pads</div>
+          <div style="color:var(--text-muted);">Customer Distance: 2.1 km</div>
+        </div>
+        <div class="job-accept-row">
+          <button class="btn btn-green" data-confirm-order="1" style="flex:1;padding:9px;font-size:0.78rem;">Confirm Order</button>
+          <button class="btn btn-red" style="flex:1;padding:9px;font-size:0.78rem;">Decline Order</button>
+        </div>
+        <div class="job-user-row">
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--magenta),var(--cyan-accent));display:flex;align-items:center;justify-content:center;font-size:1rem;">👤</div>
+          <div style="flex:1;">
+            <div style="font-size:0.72rem;color:var(--text-muted);">Driver</div>
+            <div style="font-size:0.78rem;color:#f59e0b;font-weight:700;">Rating: ⭐ 4.8</div>
+          </div>
+          <button class="btn btn-purple" style="padding:7px 12px;font-size:0.78rem;" onclick="window.location.href='chat.html?user=1'">Chat</button>
+        </div>
+      </div>
+
+      <!-- MY RATINGS — read-only, driver reviews only -->
+      <div class="white-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-size:0.82rem;font-weight:900;">MY RATINGS</span>
+          <span style="color:#f59e0b;font-size:0.82rem;pointer-events:none;user-select:none;">★★★★★</span>
+        </div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">
+          Overall: <strong style="color:#f59e0b;">4.8</strong> &nbsp;·&nbsp; <span id="totalRatingCount">32 reviews</span>
+        </div>
+
+        <!-- Star bars -->
+        <div style="margin-bottom:10px;">
+          <div class="star-bar"><span class="star-bar-label">5★</span><div class="star-bar-track"><div class="star-bar-fill" style="width:72%;"></div></div><span class="star-bar-count">23</span></div>
+          <div class="star-bar"><span class="star-bar-label">4★</span><div class="star-bar-track"><div class="star-bar-fill" style="width:19%;"></div></div><span class="star-bar-count">6</span></div>
+          <div class="star-bar"><span class="star-bar-label">3★</span><div class="star-bar-track"><div class="star-bar-fill" style="width:6%;"></div></div><span class="star-bar-count">2</span></div>
+          <div class="star-bar"><span class="star-bar-label">2★</span><div class="star-bar-track"><div class="star-bar-fill" style="width:3%;"></div></div><span class="star-bar-count">1</span></div>
+          <div class="star-bar"><span class="star-bar-label">1★</span><div class="star-bar-track"><div class="star-bar-fill" style="width:0%;"></div></div><span class="star-bar-count">0</span></div>
+        </div>
+
+        <!-- Driver reviews -->
+        <div id="myRatingsList">
+          <div class="job-user-row" style="border-top:1px solid #f3f4f6;padding-top:8px;margin-top:0;">
+            <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--blue-btn),var(--cyan-accent));display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0;">🚗</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.78rem;font-weight:700;">David Kamau</div>
+              <div style="color:#f59e0b;font-size:0.65rem;">★★★★★</div>
+              <div style="font-size:0.7rem;color:var(--text-muted);">"Quick delivery, genuine parts!"</div>
+              <div style="font-size:0.65rem;color:#9ca3af;">3 days ago</div>
+            </div>
+          </div>
+          <div class="job-user-row" style="border-top:1px solid #f3f4f6;padding-top:8px;margin-top:4px;">
+            <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--magenta),var(--purple-light));display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0;">🚗</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.78rem;font-weight:700;">Alice Njeri</div>
+              <div style="color:#f59e0b;font-size:0.65rem;">★★★★☆</div>
+              <div style="font-size:0.7rem;color:var(--text-muted);">"Good stock, reasonable prices."</div>
+              <div style="font-size:0.65rem;color:#9ca3af;">1 week ago</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rating-lock-note"><span>🔒</span> Ratings are set by drivers. Contact admin to dispute.</div>
+        <button class="stat-link" style="margin-top:8px;display:block;text-align:center;width:100%;">View all reviews</button>
+      </div>
+    </div>
+
+    <!-- CENTER -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Job Requests -->
+      <div class="white-card" style="flex:1;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span style="font-size:0.82rem;font-weight:900;">ORDER REQUESTS</span>
+          <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">Order #1234</span>
+        </div>
+
+        <div class="provider-item" style="margin-bottom:8px;">
+          <div class="provider-avatar" style="width:38px;height:38px;font-size:1.1rem;">⚙️</div>
+          <div class="provider-info">
+            <div class="provider-type">Driver</div>
+            <div class="provider-name" style="font-size:0.85rem;">James Mwangi</div>
+            <div class="provider-dist">1.5 km away</div>
+          </div>
+          <button class="btn btn-green" style="padding:6px 8px;font-size:0.72rem;" data-confirm-order="2">Confirm</button>
+        </div>
+
+        <div class="provider-item" style="margin-bottom:8px;">
+          <div class="provider-avatar" style="width:38px;height:38px;font-size:1.1rem;background:linear-gradient(135deg,#f59e0b,#ef4444);">🔩</div>
+          <div class="provider-info">
+            <div class="provider-type">Spark plugs</div>
+            <div class="provider-name" style="font-size:0.85rem;">Grace Wanjiru</div>
+            <div class="provider-dist">3.2 km away</div>
+          </div>
+          <button class="btn btn-red" style="padding:6px 8px;font-size:0.72rem;">Decline</button>
+        </div>
+
+        <div class="provider-item">
+          <div class="provider-avatar" style="width:38px;height:38px;font-size:1.1rem;background:linear-gradient(135deg,var(--purple-light),var(--magenta));">🛑</div>
+          <div class="provider-info">
+            <div class="provider-type">Brake pads</div>
+            <div class="provider-name" style="font-size:0.85rem;">Peter Njoroge</div>
+            <div class="provider-dist">4.1 km away</div>
+          </div>
+          <button class="btn btn-red" style="padding:6px 8px;font-size:0.72rem;">Decline</button>
+        </div>
+      </div>
+
+      <!-- Action Row -->
+      <div class="action-row" style="margin-bottom:0;">
+        <button id="reportIssueBtn" class="btn" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.25);color:var(--text-white);font-size:0.78rem;flex:1;">
+          ⚠️ REPORT AN ISSUE
+        </button>
+        <button class="btn btn-blue" style="font-size:0.78rem;flex:1;">
+          🔄 UPDATE DASHBOARD
+        </button>
+      </div>
+
+      <!-- Availability Widget -->
+      <div class="white-card" style="padding:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:0.82rem;font-weight:900;">My Availability</span>
+          <label class="toggle-switch" style="margin-left:8px;">
+            <input type="checkbox" id="availabilityToggle" checked/>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="availStatusBg" style="background:var(--green-btn);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;">
+          <div style="font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.85);">Status:</div>
+          <div id="availStatusValue" style="font-size:1.3rem;font-weight:900;color:#fff;">AVAILABLE</div>
+        </div>
+        <button id="switchAvailBtn" class="btn btn-red btn-full" style="font-size:0.82rem;">Switch to: Unavailable</button>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Delivery Tracking -->
+      <div class="white-card">
+        <div style="font-size:0.82rem;font-weight:900;margin-bottom:10px;">DELIVERY TRACKING</div>
+        <div style="font-size:0.78rem;font-weight:700;margin-bottom:3px;">Order Confirmed</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:100%;"></div></div>
+        <div style="font-size:0.78rem;font-weight:700;margin:8px 0 3px;">Packed</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:80%;"></div></div>
+        <div style="display:flex;justify-content:space-between;margin:8px 0 3px;">
+          <span style="font-size:0.78rem;font-weight:700;">Out for Delivery</span>
+          <span style="font-size:0.72rem;font-weight:700;color:var(--green-btn);">Delivered</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:60%;"></div></div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="notif-panel" style="margin-bottom:0;">
+        <div class="notif-panel-title">NOTIFICATIONS</div>
+        <div class="notif-list" id="shopNotifList">
+          <div class="notif-item">New order request</div>
+          <div class="notif-item">Payment confirmed</div>
+          <div class="notif-item">New rating received ⭐ 5</div>
+        </div>
+      </div>
+
+      <button class="btn btn-white btn-full" style="font-size:0.82rem;color:var(--text-dark);">
+        🔄 Update Dashboard
+      </button>
+    </div>
+
+  </div>
+
+  <footer class="page-footer" style="padding-bottom:6px;">© <span id="yr"></span> mech. All rights reserved.</footer>
+</div>
+
+<!-- Bottom Nav -->
+<nav class="dash-bottom-nav" style="left:0;right:0;max-width:900px;margin:0 auto;">
+  <button class="dash-nav-tab active" data-target="dashboard_spareshop.html">
+    <span class="d-icon">🏠</span>Dashboard
+  </button>
+  <button class="dash-nav-tab" data-target="chat.html">
+    <span class="d-icon">💬</span>Chats
+    <span class="msg-badge" style="position:absolute;top:4px;right:calc(50% - 20px);background:var(--red-btn);color:#fff;border-radius:50%;width:18px;height:18px;font-size:0.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;">5</span>
+  </button>
+  <button class="dash-nav-tab" data-target="profile.html">
+    <span class="d-icon">👤</span>Profile
+  </button>
+</nav>
+
+<script src="js/app.js"></script>
+<script>
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+const toggle    = document.getElementById('availabilityToggle');
+const statusVal = document.getElementById('availStatusValue');
+const statusBg  = document.getElementById('availStatusBg');
+const switchBtn = document.getElementById('switchAvailBtn');
+
+function setAvailability(available) {
+  if (available) {
+    statusVal.textContent = 'AVAILABLE';
+    statusBg.style.background = 'var(--green-btn)';
+    switchBtn.textContent = 'Switch to: Unavailable';
+    switchBtn.className = 'btn btn-red btn-full';
+  } else {
+    statusVal.textContent = 'UNAVAILABLE';
+    statusBg.style.background = '#6b7280';
+    switchBtn.textContent = 'Switch to: Available';
+    switchBtn.className = 'btn btn-green btn-full';
+  }
+}
+
+toggle.addEventListener('change', () => setAvailability(toggle.checked));
+switchBtn.addEventListener('click', () => { toggle.checked = !toggle.checked; setAvailability(toggle.checked); });
+
+async function loadMyRatings() {
+  const cfg   = window.MechConfig || { API_BASE:'https://mech-backend-h7nk.onrender.com' };
+  const token = JSON.parse(localStorage.getItem('mech_token')||'null');
+  if (!token) return;
+  try {
+    const res = await fetch(`${cfg.API_BASE}/api/spareshop/my-ratings`, {
+      headers:{'Authorization':`Bearer ${token}`}
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.total_reviews) document.getElementById('totalRatingCount').textContent = data.total_reviews + ' reviews';
+    if (data.reviews && data.reviews.length) {
+      document.getElementById('myRatingsList').innerHTML = data.reviews.slice(0,5).map(r => `
+        <div class="job-user-row" style="border-top:1px solid #f3f4f6;padding-top:8px;margin-top:4px;">
+          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--blue-btn),var(--cyan-accent));display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0;">🚗</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.78rem;font-weight:700;">${r.reviewer_name || 'Driver'}</div>
+            <div style="color:#f59e0b;font-size:0.65rem;">${'★'.repeat(r.stars)}${'☆'.repeat(5-r.stars)}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">"${r.comment||''}"</div>
+            <div style="font-size:0.65rem;color:#9ca3af;">${r.created_at||''}</div>
+          </div>
+        </div>`).join('');
+    }
+  } catch(e) {}
+}
+
+document.querySelectorAll('.dash-nav-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    const t = this.dataset.target;
+    if (t && t !== '#') window.location.href = t;
+  });
+});
+
+loadMyRatings();
+</script>
+</body>
+</html>
