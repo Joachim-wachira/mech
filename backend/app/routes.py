@@ -515,19 +515,3 @@ def incoming_orders():
         result.append(d)
     return success_response({"orders": result})
 
-
-# ── Confirm order (spare shop) ───────────────────────────────────
-@routes_bp.route("/orders/<int:order_id>/confirm", methods=["POST"])
-@jwt_required()
-def confirm_order(order_id):
-    from app.models import JobRequest
-    job = JobRequest.query.get(order_id)
-    if not job:
-        return error_response("Order not found", 404)
-    job.status = "active"
-    try:
-        db.session.commit()
-        return success_response({"message": "Order confirmed"})
-    except Exception as exc:
-        db.session.rollback()
-        return error_response("Could not confirm order", 500)
