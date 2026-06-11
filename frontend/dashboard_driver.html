@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#6b21c8"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="mech"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+  <title>mech — Driver Dashboard</title>
+  <link rel="stylesheet" href="css/styles.css"/>
+  <link rel="icon" type="image/svg+xml" href="logo.SVG"/>
+</head>
+<body>
+<div class="page-wrapper has-bottom-nav">
+
+  <!-- Header -->
+  <div class="logo-block" style="padding:18px 0 10px;">
+    <div class="logo-ripple-wrap" style="width:70px;height:70px;">
+      <span class="ripple-ring ripple-ring-1"></span>
+      <span class="ripple-ring ripple-ring-2"></span>
+      <span class="ripple-ring ripple-ring-3"></span>
+      <div class="logo-circle" style="width:70px;height:70px;">
+        <img src="logo.SVG" alt="mech" style="width:54px;height:54px;"/>
+      </div>
+    </div>
+    <span class="logo-name" style="font-size:1.5rem;">mech</span>
+    <h2 style="font-family:var(--font-display);font-size:1.6rem;font-weight:900;color:var(--text-white);">
+      Driver Dashboard
+    </h2>
+    <div style="font-size:0.82rem;color:rgba(255,255,255,0.7);margin-top:4px;">
+      Welcome, <span id="dashUserName">...</span>
+    </div>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="search-bar" style="margin-bottom:14px;">
+    <span class="search-icon">🔍</span>
+    <input type="text" placeholder="Search for Mechanics, Spare Shops, Rescue..." id="dashSearch"/>
+  </div>
+
+  <!-- Service Grid -->
+  <div class="service-grid-3" style="margin-bottom:14px;">
+    <div class="service-card">
+      <div class="service-card-icon">🔧</div>
+      <div class="service-card-title">Nearby Mechanics</div>
+      <div class="service-btn-row">
+        <div class="svc-icon-btn">
+          <button class="btn btn-purple" style="padding:7px 12px;font-size:0.75rem;" onclick="window.location.href='chat.html'">💬 Chat</button>
+        </div>
+      </div>
+    </div>
+    <div class="service-card">
+      <div class="service-card-icon">🛒</div>
+      <div class="service-card-title">Spare Shops</div>
+      <div class="service-btn-row">
+        <div class="svc-icon-btn">
+          <button class="btn btn-purple" style="padding:7px 12px;font-size:0.75rem;" onclick="window.location.href='chat.html'">💬 Chat</button>
+        </div>
+      </div>
+    </div>
+    <div class="service-card emergency">
+      <div class="service-card-icon">🚑</div>
+      <div class="service-card-title">Emergency Rescue</div>
+      <div class="service-btn-row">
+        <button id="emergencyCallBtn" class="btn btn-red" style="border-radius:50%;width:44px;height:44px;padding:0;font-size:1.2rem;" title="Emergency Call">📞</button>
+        <div style="font-size:0.65rem;font-weight:700;color:var(--text-white);">Call</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Provider List (real users loaded by app.js) -->
+  <div id="providerList">
+    <div style="padding:20px;text-align:center;color:#9ca3af;">🔍 Loading nearby providers...</div>
+  </div>
+
+  <!-- Action Row -->
+  <div class="action-row">
+    <button id="reportIssueBtn" class="btn" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.25);color:var(--text-white);font-size:0.82rem;">
+      ⚠️ REPORT AN ISSUE
+    </button>
+    <button id="updateDashBtn" class="btn btn-blue" style="font-size:0.82rem;">
+      🔄 UPDATE DASHBOARD
+    </button>
+  </div>
+
+  <!-- Notifications (real, loaded by app.js) -->
+  <div class="notif-panel">
+    <div class="notif-panel-title">NOTIFICATIONS</div>
+    <div class="notif-list" id="driverNotifList">
+      <div class="notif-item" style="color:#9ca3af;">Loading...</div>
+    </div>
+  </div>
+
+  <footer class="page-footer" style="padding-bottom:6px;">© <span id="yr"></span> mech. All rights reserved.</footer>
+</div>
+
+<!-- Bottom Nav -->
+<nav class="dash-bottom-nav" style="left:0;right:0;max-width:900px;margin:0 auto;">
+  <button class="dash-nav-tab active" data-target="dashboard_driver.html">
+    <span class="d-icon">🏠</span>Dashboard
+  </button>
+  <button class="dash-nav-tab" data-target="chat.html">
+    <span class="d-icon">💬</span>Chats
+  </button>
+  <button class="dash-nav-tab" data-target="profile.html">
+    <span class="d-icon">👤</span>Profile
+  </button>
+</nav>
+
+<script src="js/app.js"></script>
+<script>
+document.getElementById('yr').textContent = new Date().getFullYear();
+// Search filter on provider list
+document.getElementById('dashSearch')?.addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('#providerList .provider-item').forEach(item => {
+    item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+</script>
+</body>
+</html>
