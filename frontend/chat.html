@@ -852,6 +852,17 @@ function renderEmerg() {
   const f = ChatState.activeFilter;
   const contacts = f === 'all' ? ChatState.allEmerg : ChatState.allEmerg.filter(c => c.category === f);
   if (!contacts.length) { list.innerHTML='<div style="padding:20px;text-align:center;color:#6b7280;">No contacts in this category.</div>'; return; }
+  // Filter out any admin/placeholder rows that may have slipped through
+  contacts = contacts.filter(c =>
+    c.name &&
+    !c.name.toUpperCase().startsWith('ADD ') &&
+    !c.name.toUpperCase().startsWith('ADMIN') &&
+    !c.name.toUpperCase().includes('COUNTIES') &&
+    !c.name.toUpperCase().includes('COUNTRIES BELOW') &&
+    !c.name.toUpperCase().includes('EDIT THIS') &&
+    c.contact && c.contact !== '—' && c.contact.trim() !== ''
+  );
+  if (!contacts.length) { list.innerHTML='<div style="padding:20px;text-align:center;color:#6b7280;">No contacts in this category.</div>'; return; }
   list.innerHTML = contacts.map(c => `
     <div class="emerg-card" data-cat="${c.category}">
       <div class="emerg-icon">${c.icon||'🚨'}</div>
