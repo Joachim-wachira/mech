@@ -81,6 +81,10 @@ const WS = {
     State.socket.on('notification',  d => WS.handleNotification(d));
     State.socket.on('job_request',   d => WS.handleJobRequest(d));
     State.socket.on('call_event',    d => WS.handleCallEvent(d));
+    State.socket.on('incoming_call', d => WS.handleCallEvent(d));
+    State.socket.on('typing',        d => document.dispatchEvent(new CustomEvent('ws_typing', {detail:d})));
+    State.socket.on('stop_typing',   d => document.dispatchEvent(new CustomEvent('ws_stop_typing', {detail:d})));
+    State.socket.on('messages_read', d => document.dispatchEvent(new CustomEvent('ws_read', {detail:d})));
   },
   handleNewMessage(data) {
     State.conversations = State.conversations.map(c =>
@@ -106,7 +110,10 @@ const WS = {
     UI.showToast(`🔧 New job request from ${data.customer_name}`);
     Pages._loadJobRequests && Pages._loadJobRequests();
   },
-  handleCallEvent(data) { console.log('Call event:', data); },
+  handleCallEvent(data) {
+    // Dispatch DOM event so chat.html can show incoming call overlay
+    document.dispatchEvent(new CustomEvent('ws_incoming_call', { detail: data }));
+  },
   emit(event, data) { if (State.socket?.connected) State.socket.emit(event, data); },
   sendMessage(convId, message, type='text') {
     WS.emit('send_message', { conversation_id: convId, message, type });
@@ -642,8 +649,46 @@ const Pages = {
     set('statPendingVerify',res.pending_verify ?? '--');
   },
 
+  async _loadAdminUsers(q='') {
+    const res = await API.get(`/api/admin/users${q ? '?q='+encodeURIComponent(q) : ''}`);
+    const users = res.users || [];
+    const container = document.getElementById('userMgmtList');
+    if (!container) return;
+    if (!users.length) {
+      container.innerHTML = '<div style="padding:12px;text-align:center;color:#9ca3af;font-size:0.82rem;">No users found.</div>';
+      return;
+    }
+    container.innerHTML = users.map(u => `
+      <div class="user-mgmt-item" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f3f4f6;">
+        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--magenta),var(--cyan-accent));display:flex;align-items:center;justify-content:center;font-size:0.9rem;flex-shrink:0;">
+          ${u.role==='mechanic'?'🔧':u.role==='spareshop'?'🛒':'🚗'}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.85rem;font-weight:800;">${UI.escapeHtml(u.full_name||'')}</div>
+          <div style="font-size:0.72rem;color:#6b7280;">${UI.escapeHtml(u.email||'')} · ${u.role}</div>
+          <div style="font-size:0.68rem;color:${u.is_active?'#16a34a':'#ef4444'};">${u.is_active?'Active':'Inactive'} · ${u.is_verified?'Verified':'Unverified'}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0;">
+          ${!u.is_verified?`<button onclick="Pages._verifyUser(${u.id},true,this)" style="padding:4px 8px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:0.7rem;cursor:pointer;">✓ Verify</button>`:''}
+          <button onclick="Pages._toggleUserActive(${u.id},${u.is_active},this)" style="padding:4px 8px;background:${u.is_active?'#ef4444':'#6b7280'};color:#fff;border:none;border-radius:6px;font-size:0.7rem;cursor:pointer;">${u.is_active?'Deactivate':'Activate'}</button>
+        </div>
+      </div>`).join('');
+  },
+
+  async _verifyUser(userId, approved, btn) {
+    const res = await API.post(`/api/admin/verify/${userId}`, { approved });
+    UI.showToast(res.message || (approved ? 'User verified' : 'User declined'));
+    btn.closest('.user-mgmt-item')?.remove();
+  },
+
+  async _toggleUserActive(userId, currentlyActive, btn) {
+    const res = await API.post('/api/admin/deactivate', { user_id: userId });
+    UI.showToast(res.message || 'Done');
+    Pages._loadAdminUsers();
+  },
+
   _initAdminActions() {
-    // Verify buttons (dynamic)
+    // Verify buttons (dynamic delegation)
     document.addEventListener('click', async e => {
       if (e.target.dataset.verify) {
         const uid = e.target.dataset.verify;
@@ -654,15 +699,15 @@ const Pages = {
       }
     });
 
-    // User search
+    // User search — queries real API with debounce
     const userSearch = document.getElementById('userSearch');
     if (userSearch) {
+      let searchTimer;
       userSearch.addEventListener('input', () => {
-        const q = userSearch.value.toLowerCase();
-        document.querySelectorAll('.user-mgmt-item').forEach(item => {
-          item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
-        });
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => Pages._loadAdminUsers(userSearch.value.trim()), 400);
       });
+      Pages._loadAdminUsers(); // initial load
     }
 
     // Deactivate/suspend
@@ -882,6 +927,18 @@ const Pages = {
 
   /* ---------- shared helpers ---------- */
   _initDashNav() {
+    // Set role-aware home nav target for profile page
+    const roleDashMap = {
+      driver:    'dashboard_driver.html',
+      mechanic:  'dashboard_mechanic.html',
+      spareshop: 'dashboard_spareshop.html',
+      admin:     'dashboard_admin.html',
+    };
+    const navHome = document.getElementById('navHome');
+    if (navHome && State.role) {
+      navHome.dataset.target = roleDashMap[State.role] || 'index.html';
+    }
+
     document.querySelectorAll('.dash-nav-tab, .nav-tab').forEach(tab => {
       tab.addEventListener('click', function() {
         const target = this.dataset.target;
