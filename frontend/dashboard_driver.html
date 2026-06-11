@@ -13,6 +13,63 @@
   <title>mech — Driver Dashboard</title>
   <link rel="stylesheet" href="css/styles.css"/>
   <link rel="icon" type="image/svg+xml" href="logo.SVG"/>
+  <style>
+    /* ── Filter cards — tappable, no inner buttons ── */
+    .filter-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+    .filter-card {
+      background:rgba(255,255,255,0.07);
+      border:2px solid rgba(255,255,255,0.12);
+      border-radius:16px; padding:14px 8px 12px;
+      display:flex; flex-direction:column; align-items:center; gap:7px;
+      cursor:pointer; user-select:none;
+      transition:border-color 0.2s, background 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .filter-card:active  { transform:scale(0.96); }
+    .filter-card.active  { border-color:var(--cyan-accent); background:rgba(6,182,212,0.12); }
+    .filter-card.emergency.active { border-color:#ef4444; background:rgba(239,68,68,0.12); }
+    .filter-card-icon    { font-size:1.8rem; line-height:1; }
+    .filter-card-label   { font-size:0.72rem; font-weight:800; color:rgba(255,255,255,0.85); text-align:center; line-height:1.3; }
+    .filter-card-count   { font-size:0.65rem; font-weight:700; color:var(--cyan-accent); }
+    .filter-card.emergency .filter-card-count { color:#ef4444; }
+
+    /* ── Provider list ── */
+    .provider-item {
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.1);
+      border-radius:14px; padding:13px 14px;
+      display:flex; align-items:center; gap:12px; margin-bottom:8px;
+    }
+    .provider-avatar {
+      width:46px; height:46px; border-radius:50%;
+      background:linear-gradient(135deg,var(--magenta),var(--cyan-accent));
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.3rem; flex-shrink:0; position:relative;
+    }
+    .provider-online { position:absolute;bottom:0;right:0;width:12px;height:12px;border-radius:50%;background:#16a34a;border:2px solid var(--bg-deep); }
+    .provider-info   { flex:1; min-width:0; }
+    .provider-type   { font-size:0.68rem; font-weight:700; color:var(--cyan-accent); text-transform:uppercase; letter-spacing:0.05em; }
+    .provider-name   { font-size:0.92rem; font-weight:800; color:#fff; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .provider-dist   { font-size:0.72rem; color:#9ca3af; margin-top:2px; }
+    .provider-actions{ display:flex; gap:6px; flex-shrink:0; }
+    .action-icon-btn {
+      width:36px; height:36px; border-radius:50%;
+      background:rgba(255,255,255,0.1); border:none; color:#fff;
+      font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      transition:background 0.15s;
+    }
+    .action-icon-btn:hover { background:rgba(255,255,255,0.2); }
+
+    /* ── Emergency quick-dial (shown when Emergency card active) ── */
+    .emerg-quick { display:none; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:14px; padding:14px; margin-bottom:10px; }
+    .emerg-quick.show { display:block; }
+    .emerg-quick-title { font-size:0.78rem; font-weight:900; color:#ef4444; margin-bottom:10px; }
+    .emerg-dial-row { display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid rgba(239,68,68,0.15); }
+    .emerg-dial-row:last-child { border-bottom:none; padding-bottom:0; }
+    .emerg-dial-name { font-size:0.82rem; font-weight:700; color:#fff; }
+    .emerg-dial-num  { font-size:0.75rem; color:#9ca3af; }
+    .emerg-call-link { background:#ef4444; color:#fff; border:none; border-radius:999px; padding:6px 14px; font-size:0.75rem; font-weight:800; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:4px; }
+  </style>
 </head>
 <body>
 <div class="page-wrapper has-bottom-nav">
@@ -31,54 +88,72 @@
     <h2 style="font-family:var(--font-display);font-size:1.6rem;font-weight:900;color:var(--text-white);">
       Driver Dashboard
     </h2>
-    <div style="font-size:0.82rem;color:rgba(255,255,255,0.7);margin-top:4px;">
-      Welcome, <span id="dashUserName">...</span>
+    <div style="font-size:0.85rem;color:rgba(255,255,255,0.75);margin-top:4px;">
+      Welcome, <span id="dashUserName" style="font-weight:800;color:var(--cyan-accent);">...</span>
     </div>
   </div>
 
   <!-- Search Bar -->
   <div class="search-bar" style="margin-bottom:14px;">
     <span class="search-icon">🔍</span>
-    <input type="text" placeholder="Search for Mechanics, Spare Shops, Rescue..." id="dashSearch"/>
+    <input type="text" placeholder="Search mechanics, spare shops..." id="dashSearch"/>
   </div>
 
-  <!-- Service Grid -->
-  <div class="service-grid-3" style="margin-bottom:14px;">
-    <div class="service-card">
-      <div class="service-card-icon">🔧</div>
-      <div class="service-card-title">Nearby Mechanics</div>
-      <div class="service-btn-row">
-        <div class="svc-icon-btn">
-          <button class="btn btn-purple" style="padding:7px 12px;font-size:0.75rem;" onclick="window.location.href='chat.html'">💬 Chat</button>
-        </div>
-      </div>
+  <!-- Filter Cards — tap to filter, no buttons inside -->
+  <div class="filter-cards">
+    <div class="filter-card active" id="filterAll" data-filter="all" onclick="setFilter('all')">
+      <div class="filter-card-icon">📍</div>
+      <div class="filter-card-label">All Nearby</div>
+      <div class="filter-card-count" id="countAll">—</div>
     </div>
-    <div class="service-card">
-      <div class="service-card-icon">🛒</div>
-      <div class="service-card-title">Spare Shops</div>
-      <div class="service-btn-row">
-        <div class="svc-icon-btn">
-          <button class="btn btn-purple" style="padding:7px 12px;font-size:0.75rem;" onclick="window.location.href='chat.html'">💬 Chat</button>
-        </div>
-      </div>
+    <div class="filter-card" id="filterMechanic" data-filter="mechanic" onclick="setFilter('mechanic')">
+      <div class="filter-card-icon">🔧</div>
+      <div class="filter-card-label">Mechanics</div>
+      <div class="filter-card-count" id="countMechanic">—</div>
     </div>
-    <div class="service-card emergency">
-      <div class="service-card-icon">🚑</div>
-      <div class="service-card-title">Emergency Rescue</div>
-      <div class="service-btn-row">
-        <button id="emergencyCallBtn" class="btn btn-red" style="border-radius:50%;width:44px;height:44px;padding:0;font-size:1.2rem;" title="Emergency Call">📞</button>
-        <div style="font-size:0.65rem;font-weight:700;color:var(--text-white);">Call</div>
-      </div>
+    <div class="filter-card" id="filterSpareshop" data-filter="spareshop" onclick="setFilter('spareshop')">
+      <div class="filter-card-icon">🛒</div>
+      <div class="filter-card-label">Spare Shops</div>
+      <div class="filter-card-count" id="countSpareshop">—</div>
+    </div>
+    <div class="filter-card emergency" id="filterEmergency" data-filter="emergency" onclick="setFilter('emergency')" style="grid-column:1/-1;">
+      <div class="filter-card-icon">🚨</div>
+      <div class="filter-card-label">Emergency Rescue — tap to view emergency contacts</div>
+      <div class="filter-card-count">24/7 Kenya emergency lines</div>
     </div>
   </div>
 
-  <!-- Provider List (real users loaded by app.js) -->
+  <!-- Emergency quick-dial (shows when Emergency card is active) -->
+  <div class="emerg-quick" id="emergQuick">
+    <div class="emerg-quick-title">🚨 Kenya Emergency Lines — tap to call</div>
+    <div class="emerg-dial-row">
+      <div><div class="emerg-dial-name">Police / Fire / Ambulance</div><div class="emerg-dial-num">Nationwide · Free</div></div>
+      <a href="tel:999" class="emerg-call-link">📞 999</a>
+    </div>
+    <div class="emerg-dial-row">
+      <div><div class="emerg-dial-name">Kenya Red Cross Ambulance</div><div class="emerg-dial-num">Nationwide · Free 24/7</div></div>
+      <a href="tel:1199" class="emerg-call-link">📞 1199</a>
+    </div>
+    <div class="emerg-dial-row">
+      <div><div class="emerg-dial-name">Kirinyaga County Ambulance</div><div class="emerg-dial-num">Kirinyaga County</div></div>
+      <a href="tel:07112345567" class="emerg-call-link">📞 0711 234 567</a>
+    </div>
+    <div class="emerg-dial-row">
+      <div><div class="emerg-dial-name">OCPD Kirinyaga Police</div><div class="emerg-dial-num">Kirinyaga County</div></div>
+      <a href="tel:06021266" class="emerg-call-link">📞 060-21266</a>
+    </div>
+    <div style="margin-top:10px;text-align:center;">
+      <a href="chat.html?tab=emergency" style="font-size:0.78rem;color:var(--cyan-accent);font-weight:700;text-decoration:none;">View all emergency contacts →</a>
+    </div>
+  </div>
+
+  <!-- Provider List -->
   <div id="providerList">
-    <div style="padding:20px;text-align:center;color:#9ca3af;">🔍 Loading nearby providers...</div>
+    <div style="padding:24px;text-align:center;color:#9ca3af;">🔍 Loading nearby providers...</div>
   </div>
 
   <!-- Action Row -->
-  <div class="action-row">
+  <div class="action-row" style="margin-top:10px;">
     <button id="reportIssueBtn" class="btn" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.25);color:var(--text-white);font-size:0.82rem;">
       ⚠️ REPORT AN ISSUE
     </button>
@@ -87,8 +162,8 @@
     </button>
   </div>
 
-  <!-- Notifications (real, loaded by app.js) -->
-  <div class="notif-panel">
+  <!-- Notifications -->
+  <div class="notif-panel" style="margin-top:14px;">
     <div class="notif-panel-title">NOTIFICATIONS</div>
     <div class="notif-list" id="driverNotifList">
       <div class="notif-item" style="color:#9ca3af;">Loading...</div>
@@ -98,29 +173,213 @@
   <footer class="page-footer" style="padding-bottom:6px;">© <span id="yr"></span> mech. All rights reserved.</footer>
 </div>
 
-<!-- Bottom Nav -->
+<!-- Bottom Nav — inline script so clicks ALWAYS work regardless of app.js timing -->
 <nav class="dash-bottom-nav" style="left:0;right:0;max-width:900px;margin:0 auto;">
-  <button class="dash-nav-tab active" data-target="dashboard_driver.html">
+  <button class="dash-nav-tab active" onclick="window.location.href='dashboard_driver.html'">
     <span class="d-icon">🏠</span>Dashboard
   </button>
-  <button class="dash-nav-tab" data-target="chat.html">
+  <button class="dash-nav-tab" onclick="window.location.href='chat.html'">
     <span class="d-icon">💬</span>Chats
   </button>
-  <button class="dash-nav-tab" data-target="profile.html">
+  <button class="dash-nav-tab" onclick="window.location.href='profile.html'">
     <span class="d-icon">👤</span>Profile
   </button>
 </nav>
 
 <script src="js/app.js"></script>
 <script>
+'use strict';
 document.getElementById('yr').textContent = new Date().getFullYear();
-// Search filter on provider list
-document.getElementById('dashSearch')?.addEventListener('input', function() {
-  const q = this.value.toLowerCase();
-  document.querySelectorAll('#providerList .provider-item').forEach(item => {
-    item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
-  });
+
+/* ── Populate user name from storage immediately ── */
+(function() {
+  try {
+    const u = JSON.parse(localStorage.getItem('mech_user') || 'null');
+    if (u && u.full_name) document.getElementById('dashUserName').textContent = u.full_name.split(' ')[0];
+  } catch(e) {}
+})();
+
+/* ── Auth guard — redirect to login if not logged in ── */
+(function() {
+  const token = localStorage.getItem('mech_token');
+  if (!token || token === 'null') window.location.href = 'login.html';
+})();
+
+/* ── Provider data store ── */
+let _allProviders = [];
+let _currentFilter = 'all';
+
+/* ── Filter card logic ── */
+function setFilter(type) {
+  _currentFilter = type;
+  // Update active card
+  document.querySelectorAll('.filter-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('filter' + type.charAt(0).toUpperCase() + type.slice(1))?.classList.add('active');
+  // Toggle emergency panel
+  const eq = document.getElementById('emergQuick');
+  if (type === 'emergency') { eq.classList.add('show'); renderProviders([]); return; }
+  eq.classList.remove('show');
+  renderProviders(_allProviders.filter(p => type === 'all' ? true : p.role === type));
+}
+
+/* ── Search filter ── */
+document.getElementById('dashSearch').addEventListener('input', function() {
+  const q = this.value.toLowerCase().trim();
+  if (!q) { renderProviders(_allProviders.filter(p => _currentFilter === 'all' || p.role === _currentFilter)); return; }
+  renderProviders(_allProviders.filter(p => {
+    const match = (p.full_name||'').toLowerCase().includes(q) ||
+                  (p.business_name||'').toLowerCase().includes(q) ||
+                  (p.location_text||'').toLowerCase().includes(q) ||
+                  (p.role||'').toLowerCase().includes(q);
+    const roleOk = _currentFilter === 'all' || _currentFilter === 'emergency' || p.role === _currentFilter;
+    return match && roleOk;
+  }));
 });
+
+/* ── Render provider list ── */
+function renderProviders(list) {
+  const container = document.getElementById('providerList');
+  if (!list.length) {
+    container.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:0.88rem;">No providers found in this category yet.<br><span style="font-size:0.75rem;">More appear as mechanics and spare shops join.</span></div>';
+    return;
+  }
+  container.innerHTML = list.map(p => {
+    const icon   = p.role === 'mechanic' ? '🔧' : '🛒';
+    const label  = p.role === 'mechanic' ? 'Mechanic' : 'Spare Shop';
+    const dist   = p.distance != null ? `${Number(p.distance).toFixed(1)} km away` : 'Nearby';
+    const avail  = p.is_available
+      ? '<span style="color:#16a34a;font-size:0.68rem;font-weight:700;">● Available</span>'
+      : '<span style="color:#9ca3af;font-size:0.68rem;">● Unavailable</span>';
+    const name   = escHtml(p.full_name || p.business_name || 'Provider');
+    const loc    = escHtml(p.location_text || '');
+    return `<div class="provider-item" data-user-id="${p.id}">
+      <div class="provider-avatar">
+        ${icon}
+        ${p.is_available ? '<div class="provider-online"></div>' : ''}
+      </div>
+      <div class="provider-info">
+        <div class="provider-type">${label} ${avail}</div>
+        <div class="provider-name">${name}</div>
+        <div class="provider-dist">${dist}${loc ? ' · '+loc : ''}</div>
+      </div>
+      <div class="provider-actions">
+        <button class="action-icon-btn" title="Chat" onclick="startChat(${p.id})">💬</button>
+        <button class="action-icon-btn" title="Call" onclick="startCall(${p.id},'${name}')">📞</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(str) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(str));
+  return d.innerHTML;
+}
+
+/* ── Start chat — create/fetch conversation then navigate ── */
+async function startChat(userId) {
+  try {
+    const token = JSON.parse(localStorage.getItem('mech_token'));
+    const res = await fetch('https://mech-backend-h7nk.onrender.com/api/conversations/start', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${token}` },
+      body: JSON.stringify({ participant_id: userId }),
+    });
+    const data = await res.json();
+    const convId = data.conversation_id || data.id;
+    window.location.href = convId ? `chat.html?conv=${convId}` : `chat.html?user=${userId}`;
+  } catch(e) {
+    window.location.href = `chat.html?user=${userId}`;
+  }
+}
+
+/* ── Start voice call ── */
+function startCall(userId, name) {
+  window.location.href = `chat.html?user=${userId}&call=1`;
+}
+
+/* ── Load nearby providers from API ── */
+async function loadProviders() {
+  const container = document.getElementById('providerList');
+  try {
+    const token = JSON.parse(localStorage.getItem('mech_token'));
+    const headers = { 'Authorization': `Bearer ${token}` };
+
+    // Try with GPS first
+    let lat = null, lng = null;
+    try {
+      const pos = await new Promise((res, rej) =>
+        navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 })
+      );
+      lat = pos.coords.latitude; lng = pos.coords.longitude;
+    } catch(_) {}
+
+    const suffix = lat ? `?lat=${lat}&lng=${lng}` : '';
+    const [mRes, sRes] = await Promise.all([
+      fetch(`https://mech-backend-h7nk.onrender.com/api/nearby/mechanic${suffix}`, { headers }),
+      fetch(`https://mech-backend-h7nk.onrender.com/api/nearby/spareshop${suffix}`, { headers }),
+    ]);
+    const mData = await mRes.json();
+    const sData = await sRes.json();
+
+    _allProviders = [...(mData.providers || []), ...(sData.providers || [])];
+
+    // Update counts
+    const mechanics  = _allProviders.filter(p => p.role === 'mechanic');
+    const spareshops = _allProviders.filter(p => p.role === 'spareshop');
+    document.getElementById('countAll').textContent       = `${_allProviders.length} found`;
+    document.getElementById('countMechanic').textContent  = `${mechanics.length} found`;
+    document.getElementById('countSpareshop').textContent = `${spareshops.length} found`;
+
+    renderProviders(_allProviders);
+  } catch(e) {
+    container.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;">Could not load providers — check your connection.</div>';
+  }
+}
+
+/* ── Load notifications ── */
+async function loadNotifications() {
+  const panel = document.getElementById('driverNotifList');
+  try {
+    const token = JSON.parse(localStorage.getItem('mech_token'));
+    const res = await fetch('https://mech-backend-h7nk.onrender.com/api/notifications', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    const notifs = data.notifications || [];
+    if (!notifs.length) {
+      panel.innerHTML = '<div class="notif-item" style="color:#9ca3af;">No new notifications.</div>';
+      return;
+    }
+    panel.innerHTML = notifs.slice(0, 8).map(n =>
+      `<div class="notif-item">${escHtml(n.message || n)}</div>`
+    ).join('');
+  } catch(e) {
+    panel.innerHTML = '<div class="notif-item" style="color:#9ca3af;">Could not load notifications.</div>';
+  }
+}
+
+/* ── Report issue ── */
+document.getElementById('reportIssueBtn').addEventListener('click', async () => {
+  const desc = prompt('Describe the issue:');
+  if (!desc) return;
+  try {
+    const token = JSON.parse(localStorage.getItem('mech_token'));
+    await fetch('https://mech-backend-h7nk.onrender.com/api/issues', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${token}` },
+      body: JSON.stringify({ description: desc }),
+    });
+  } catch(_) {}
+  alert('Issue reported. Thank you!');
+});
+
+/* ── Update dashboard ── */
+document.getElementById('updateDashBtn').addEventListener('click', () => location.reload());
+
+/* ── Init ── */
+loadProviders();
+loadNotifications();
 </script>
 </body>
 </html>
