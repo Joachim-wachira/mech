@@ -95,8 +95,19 @@ def _load_from_excel():
             cells = (list(row) + [None] * 9)[:9]
             num, country, region, name, location, contact, category, available, notes = cells
 
-            if not name or str(name).strip().upper().startswith("ADMIN"):
-                continue  # skip blank rows and admin note rows
+            name_str = str(name).strip()
+            name_upper = name_str.upper()
+            # Skip blank rows, admin notes, and any instructional placeholder rows
+            if (not name_str or
+                name_upper.startswith("ADMIN") or
+                name_upper.startswith("ADD MORE") or
+                name_upper.startswith("ADD ") or
+                "COUNTIES" in name_upper or
+                "COUNTRIES BELOW" in name_upper or
+                "EDIT THIS" in name_upper or
+                name_upper.startswith("NOTE:") or
+                not contact):
+                continue  # skip blank, instructional, or incomplete rows
 
             cat = str(category or "").strip()
             contacts.append({
