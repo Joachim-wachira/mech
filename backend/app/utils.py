@@ -87,25 +87,41 @@ def error_response(message, status=400):
 
 
 def nearby_providers(role, lat, lng, radius_km=None):
-    """Return User objects of the given role within radius_km, sorted by distance."""
+    """
+    Return providers of the given role sorted by distance.
+    - If driver has GPS (lat/lng): show all providers within radius_km,
+      plus ALL providers with no GPS coords (they show as "Nearby").
+    - If driver has no GPS: show ALL active+available providers.
+    - radius_km default is 50 km to avoid providers being hidden on a
+      platform still growing its user base.
+    """
     from app import db
     if radius_km is None:
-        radius_km = current_app.config.get("NEARBY_RADIUS_KM", 25)
+        radius_km = current_app.config.get("NEARBY_RADIUS_KM", 50)
 
+    # Base query — active and available (no GPS filter here)
     users = (
         User.query
         .filter_by(role=role, is_active=True, is_available=True)
-        .filter(User.location_lat.isnot(None), User.location_lng.isnot(None))
         .all()
     )
 
     results = []
     for u in users:
-        dist = haversine_km(lat, lng, u.location_lat, u.location_lng)
-        if dist <= radius_km:
+        if lat is not None and lng is not None and u.location_lat and u.location_lng:
+            # Both driver and provider have GPS — apply radius filter
+            dist = haversine_km(lat, lng, u.location_lat, u.location_lng)
+            if dist <= radius_km:
+                d = u.to_dict()
+                d["distance"] = round(dist, 2)
+                results.append(d)
+        else:
+            # Either driver or provider has no GPS — show anyway, no distance
             d = u.to_dict()
-            d["distance"] = round(dist, 2)
+            d["distance"] = None
             results.append(d)
 
-    results.sort(key=lambda x: x["distance"])
-    return results
+    # Sort: providers with distance first (closest first), then no-GPS providers
+    with_dist    = sorted([r for r in results if r["distance"] is not None], key=lambda x: x["distance"])
+    without_dist = [r for r in results if r["distance"] is None]
+    return with_dist + without_dist
