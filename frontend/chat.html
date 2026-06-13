@@ -1042,8 +1042,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.MechApp.Pages.chat = function () {};
   }
 
-  /* Auth check — delegates to app.js Auth which already ran init() */
+  /* Auth — must call init() first to populate State.token from localStorage.
+     isLoggedIn() checks State.token which is only set after init() runs.
+     We cannot rely on app.js auto-init having fired first (race condition). */
   const app = window.MechApp;
+  app?.Auth?.init();
   if (!app?.Auth?.isLoggedIn()) {
     window.location.href = 'login.html';
     return;
