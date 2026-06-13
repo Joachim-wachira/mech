@@ -6,8 +6,8 @@
 
 'use strict';
 
-const CACHE_NAME     = 'mech-v1.0.0';
-const API_CACHE_NAME = 'mech-api-v1.0.0';
+const CACHE_NAME     = 'mech-v1.1.0';   // bumped — forces old cache eviction
+const API_CACHE_NAME = 'mech-api-v1.1.0';
 
 /* ── Assets to pre-cache on install ─────────────────────────── */
 const PRECACHE_ASSETS = [
@@ -101,7 +101,14 @@ self.addEventListener('fetch', (event) => {
   // ── Socket.IO handshake → always network, never cache ───────
   if (url.pathname.startsWith('/socket.io/')) return;
 
-  // ── Everything else (HTML, CSS, JS, SVG) → Cache-First ──────
+  // ── HTML pages → Network-First so updates reach users immediately ──
+  // Falls back to cache when offline. CSS/JS/SVG stay cache-first for speed.
+  if (request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname === '/') {
+    event.respondWith(networkFirstWithCache(request, CACHE_NAME, 3600));
+    return;
+  }
+
+  // ── CSS, JS, SVG, images → Cache-First (long-lived assets) ──
   event.respondWith(cacheFirstWithOfflineFallback(request));
 });
 
