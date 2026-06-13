@@ -189,32 +189,61 @@ def create_app(config_object=None):
         from app.models import User
         from werkzeug.security import generate_password_hash
 
+        # ── 1. Auth check ────────────────────────────────────
         setup_secret = os.environ.get("SETUP_SECRET", "")
         if not setup_secret:
-            return jsonify({"error": "SETUP_SECRET env var not set"}), 403
+            return jsonify({
+                "error": "SETUP_SECRET env var not set on server. "
+                         "Add it in Render → Environment → SETUP_SECRET."
+            }), 403
         if request.headers.get("X-Setup-Secret", "") != setup_secret:
-            return jsonify({"error": "Forbidden"}), 403
+            return jsonify({"error": "Forbidden — wrong X-Setup-Secret value"}), 403
 
+        # ── 2. Validate body ─────────────────────────────────
         data = request.get_json() or {}
         for field in ["email", "password", "phone", "full_name"]:
             if not data.get(field):
                 return jsonify({"error": f"Missing required field: {field}"}), 400
 
-        if User.query.filter_by(role="admin").first():
-            return jsonify({"error": "Admin already exists — use /api/auth/login"}), 409
+        if len(data["password"]) < 8:
+            return jsonify({"error": "Password must be at least 8 characters"}), 400
 
-        admin = User(
-            full_name      = data["full_name"],
-            email          = data["email"].strip().lower(),
-            phone          = data["phone"].strip(),
-            role           = "admin",
-            is_verified    = True,
-            is_active      = True,
-            phone_verified = True,
-        )
-        admin.password_hash = generate_password_hash(data["password"])
-        db.session.add(admin)
-        db.session.commit()
-        return jsonify({"success": True, "message": "Admin created. Login at /api/auth/login"}), 201
+        # ── 3. Create admin ──────────────────────────────────
+        try:
+            if User.query.filter_by(role="admin").first():
+                return jsonify({"error": "Admin already exists — use /api/auth/login"}), 409
+
+            if User.query.filter_by(email=data["email"].strip().lower()).first():
+                return jsonify({"error": "Email already registered"}), 409
+
+            if User.query.filter_by(phone=data["phone"].strip()).first():
+                return jsonify({"error": "Phone already registered"}), 409
+
+            admin = User(
+                full_name      = data["full_name"].strip(),
+                email          = data["email"].strip().lower(),
+                phone          = data["phone"].strip(),
+                role           = "admin",
+                is_verified    = True,
+                is_active      = True,
+                phone_verified = True,
+            )
+            admin.password_hash = generate_password_hash(data["password"])
+            db.session.add(admin)
+            db.session.commit()
+            app.logger.info(f"[setup-admin] Admin created: {admin.email}")
+            return jsonify({
+                "success": True,
+                "message": "Admin created successfully. You can now login at /api/auth/login. "
+                           "Remove SETUP_SECRET from Render env vars for security."
+            }), 201
+
+        except Exception as exc:
+            db.session.rollback()
+            app.logger.error(f"[setup-admin] DB error: {exc}")
+            return jsonify({
+                "error": "Database error — check Render logs",
+                "detail": str(exc)
+            }), 500
 
     return app
