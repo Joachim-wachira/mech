@@ -323,7 +323,7 @@
 <div id="chatShell" style="display:flex;flex-direction:column;flex:1;padding-bottom:70px;">
 
   <!-- Header -->
-  <div class="logo-block" style="padding:16px 0 8px;">
+  <div class="logo-block" style="padding:16px 0 8px;position:relative;">
     <div class="logo-ripple-wrap" style="width:60px;height:60px;">
       <span class="ripple-ring ripple-ring-1"></span>
       <span class="ripple-ring ripple-ring-2"></span>
@@ -333,6 +333,13 @@
     </div>
     <span class="logo-name" style="font-size:1.3rem;">mech</span>
     <h2 id="pageTitle" style="font-family:var(--font-display);font-size:1.4rem;font-weight:900;color:var(--text-white);">CHATS</h2>
+
+    <div style="position:absolute;top:16px;right:16px;display:flex;gap:8px;">
+      <button id="navHomeBtn" title="Dashboard"
+        style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.1);
+               border:none;color:#fff;font-size:1.1rem;cursor:pointer;
+               display:flex;align-items:center;justify-content:center;">🏠</button>
+    </div>
   </div>
 
   <!-- ═══ TAB: CHATS ═══ -->
@@ -480,19 +487,17 @@
   </div>
 </div>
 
+<!-- Force service worker to update immediately, clearing stale blank chat.html cache -->
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.update());
+  });
+}
+</script>
 <!-- app.js must load first — it sets up Auth, API, WS, State on window.MechApp -->
 <script src="config.js"></script>
 <script src="js/app.js"></script>
-<script>
-/* Override Pages.chat SYNCHRONOUSLY before any DOMContentLoaded fires.
-   app.js registers its own DOMContentLoaded that calls Pages.chat() via pageMap.
-   Both handlers queue at the same time — whichever runs first wins.
-   By overriding here (sync, before DOM ready), we guarantee ours wins. */
-if (window.MechApp && window.MechApp.Pages) {
-  window.MechApp.Pages.chat = function () {};
-}
-</script>
-
 <script>
 /* ================================================================
    MECH — chat.html standalone controller
@@ -1041,14 +1046,25 @@ document.addEventListener('ws_read', () => {
 
 /* ================================================================
    INIT
+   ================================================================
+   IMPORTANT: We do NOT add a second DOMContentLoaded listener.
+   app.js already registers one that runs Auth.init() and dispatches
+   pageMap['chat.html']() = Pages.chat(). We REPLACE Pages.chat with
+   our own init function below (assigned synchronously, right after
+   app.js loads, BEFORE DOMContentLoaded fires). This means:
+     - No race condition (only ONE init path exists)
+     - Auth.init() is guaranteed to have run already (app.js does it
+       at the top of its DOMContentLoaded handler, before dispatch)
+     - isLoggedIn() check below is therefore reliable
    ================================================================ */
-window.addEventListener('DOMContentLoaded', async () => {
-  /* Auth — must call init() first to populate State.token from localStorage.
-     isLoggedIn() checks State.token which is only set after init() runs.
-     We cannot rely on app.js auto-init having fired first (race condition). */
+async function chatPageInit() {
   const app = window.MechApp;
-  app?.Auth?.init();
-  if (!app?.Auth?.isLoggedIn()) {
+
+  // Defensive: app.js's own DOMContentLoaded already called Auth.init()
+  // before dispatching to us, but call again in case of direct invocation.
+  app.Auth.init();
+  if (!app.Auth.isLoggedIn()) {
+    console.warn('[chat] Not logged in — redirecting to login.');
     window.location.href = 'login.html';
     return;
   }
@@ -1058,6 +1074,20 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   /* Socket wired after connect (small delay for socket handshake) */
   setTimeout(wireSocket, 800);
+
+  /* Home nav — role-aware dashboard target */
+  const roleDashMap = {
+    driver:    'dashboard_driver.html',
+    mechanic:  'dashboard_mechanic.html',
+    spareshop: 'dashboard_spareshop.html',
+    admin:     'dashboard_admin.html',
+  };
+  const homeBtn = document.getElementById('navHomeBtn');
+  if (homeBtn) {
+    homeBtn.addEventListener('click', () => {
+      window.location.href = roleDashMap[app.State.role] || 'index.html';
+    });
+  }
 
   /* Load data */
   loadEmerg();
@@ -1077,7 +1107,15 @@ window.addEventListener('DOMContentLoaded', async () => {
       await openConv(res.conversation_id || res.id, 'User ' + userId, '👤', parseInt(userId));
     }
   }
-});
+}
+
+/* Assign synchronously — app.js's pageMap reads Pages.chat at dispatch
+   time (inside its own DOMContentLoaded), which is AFTER this script
+   has fully executed. So pageMap['chat.html'] will correctly resolve
+   to chatPageInit. */
+if (window.MechApp && window.MechApp.Pages) {
+  window.MechApp.Pages.chat = chatPageInit;
+}
 </script>
 </body>
 </html>

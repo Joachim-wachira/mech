@@ -6,8 +6,8 @@
 
 'use strict';
 
-const CACHE_NAME     = 'mech-v1.1.0';   // bumped — forces old cache eviction
-const API_CACHE_NAME = 'mech-api-v1.1.0';
+const CACHE_NAME     = 'mech-v1.4.0';   // bumped — fixed logout button (app.js)
+const API_CACHE_NAME = 'mech-api-v1.4.0';
 
 /* ── Assets to pre-cache on install ─────────────────────────── */
 const PRECACHE_ASSETS = [
