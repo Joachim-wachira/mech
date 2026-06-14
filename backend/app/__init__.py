@@ -208,21 +208,55 @@ def create_app(config_object=None):
         if len(data["password"]) < 8:
             return jsonify({"error": "Password must be at least 8 characters"}), 400
 
-        # ── 3. Create admin ──────────────────────────────────
+        email = data["email"].strip().lower()
+        phone = data["phone"].strip()
+
+        # ── 3. Create OR promote ──────────────────────────────
         try:
+            # Look for an existing account with this email or phone.
+            # If it exists (e.g. a driver/mechanic/spareshop account),
+            # PROMOTE it to admin instead of rejecting as a duplicate.
+            existing = User.query.filter(
+                (User.email == email) | (User.phone == phone)
+            ).first()
+
+            if existing:
+                if existing.role == "admin":
+                    return jsonify({
+                        "error": "This account is already an admin — use /api/auth/login"
+                    }), 409
+
+                previous_role = existing.role
+                existing.role           = "admin"
+                existing.is_verified    = True
+                existing.is_active      = True
+                existing.phone_verified = True
+                existing.full_name      = data["full_name"].strip()
+                existing.password_hash  = generate_password_hash(data["password"])
+                db.session.commit()
+                app.logger.info(
+                    f"[setup-admin] Promoted existing {previous_role} account "
+                    f"({existing.email}) to admin"
+                )
+                return jsonify({
+                    "success": True,
+                    "message": f"Existing {previous_role} account promoted to admin. "
+                               "You can now login at /api/auth/login with the new password. "
+                               "Remove SETUP_SECRET from Render env vars for security."
+                }), 200
+
+            # No existing account with this email/phone — only block if
+            # ANOTHER admin already exists (prevents accidental re-creation).
             if User.query.filter_by(role="admin").first():
-                return jsonify({"error": "Admin already exists — use /api/auth/login"}), 409
-
-            if User.query.filter_by(email=data["email"].strip().lower()).first():
-                return jsonify({"error": "Email already registered"}), 409
-
-            if User.query.filter_by(phone=data["phone"].strip()).first():
-                return jsonify({"error": "Phone already registered"}), 409
+                return jsonify({
+                    "error": "An admin already exists. To promote a different account, "
+                             "use that account's existing email/phone in this request."
+                }), 409
 
             admin = User(
                 full_name      = data["full_name"].strip(),
-                email          = data["email"].strip().lower(),
-                phone          = data["phone"].strip(),
+                email          = email,
+                phone          = phone,
                 role           = "admin",
                 is_verified    = True,
                 is_active      = True,
