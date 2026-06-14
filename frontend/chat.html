@@ -541,8 +541,6 @@ const EMERG_FALLBACK = [
   {id:10, name:'National Ambulance (Alt)',      location:'Nationwide',          contact:'0800 723 253', category:'Ambulance', icon:'🚑', notes:'Free government ambulance line'},
 ];
 
-const CAT_CLS = { Police:'cat-police', Medical:'cat-medical', Fire:'cat-fire', Ambulance:'cat-ambulance' };
-
 /* ── Helpers ── */
 function esc(str) {
   const d = document.createElement('div');
@@ -868,17 +866,33 @@ async function loadEmerg() {
     const r = await fetch((window.MechConfig?.API_BASE || 'https://mech-backend-h7nk.onrender.com') + '/api/emergency/contacts');
     if (!r.ok) throw new Error('non-200');
     const d = await r.json();
-    CS.allEmerg = d.contacts || d;
+    const contacts = d.contacts || d;
+    CS.allEmerg = (Array.isArray(contacts) && contacts.length) ? contacts : EMERG_FALLBACK;
   } catch (_) {
     CS.allEmerg = EMERG_FALLBACK;
+  }
+  // The fetch is async and may finish AFTER the user has already switched
+  // to the Emergency tab (where renderEmerg ran against an empty list).
+  // Re-render now that data has arrived, if the tab is currently visible.
+  if (document.getElementById('sec-emergency')?.classList.contains('active')) {
+    renderEmerg();
   }
 }
 
 function renderEmerg() {
-  const list     = document.getElementById('emergList');
+  const list = document.getElementById('emergList');
+
+  if (!CS.allEmerg.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">⏳ Loading emergency contacts...</div>';
+    return;
+  }
+
+  // Backend categories can be combined (e.g. "Police / Fire / Ambulance",
+  // "Medical / Rescue") — match if the filter is a SUBSTRING of the
+  // contact's category, not an exact match.
   const filtered = CS.activeFilter === 'all'
     ? CS.allEmerg
-    : CS.allEmerg.filter(c => c.category === CS.activeFilter);
+    : CS.allEmerg.filter(c => (c.category || '').toLowerCase().includes(CS.activeFilter.toLowerCase()));
 
   if (!filtered.length) {
     list.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7280;">No contacts in this category.</div>';
@@ -889,15 +903,25 @@ function renderEmerg() {
       <div class="emerg-icon">${c.icon || '🚨'}</div>
       <div class="emerg-info">
         <div class="emerg-name">${esc(c.name)}</div>
-        <div class="emerg-loc">📍 ${esc(c.location || 'Kenya')}</div>
+        <div class="emerg-loc">📍 ${esc(c.location || c.region || c.country || '')}</div>
         <div class="emerg-num">📞 ${esc(c.contact)}</div>
-        <span class="emerg-cat ${CAT_CLS[c.category] || 'cat-ambulance'}">${esc(c.category)}</span>
+        <span class="emerg-cat ${matchCatClass(c.category)}">${esc(c.category)}</span>
         ${c.notes ? `<div style="font-size:0.68rem;color:#9ca3af;margin-top:2px;">${esc(c.notes)}</div>` : ''}
       </div>
       <a href="tel:${c.contact.replace(/\s/g,'')}"
          class="emerg-call-btn"
          onclick="logEmergCall('${esc(c.name)}','${esc(c.contact)}')">📞</a>
     </div>`).join('');
+}
+
+/* Map a (possibly combined) category string to the closest badge color */
+function matchCatClass(category) {
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('police'))    return 'cat-police';
+  if (cat.includes('fire'))      return 'cat-fire';
+  if (cat.includes('medical'))   return 'cat-medical';
+  if (cat.includes('ambulance')) return 'cat-ambulance';
+  return 'cat-ambulance';
 }
 
 document.querySelectorAll('.filter-chip').forEach(btn => {
@@ -908,6 +932,7 @@ document.querySelectorAll('.filter-chip').forEach(btn => {
     renderEmerg();
   });
 });
+
 
 function logEmergCall(name, number) {
   const log = JSON.parse(localStorage.getItem('mech_emerg_log') || '[]');

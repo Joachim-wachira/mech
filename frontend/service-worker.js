@@ -6,8 +6,8 @@
 
 'use strict';
 
-const CACHE_NAME     = 'mech-v1.4.0';   // bumped — fixed logout button (app.js)
-const API_CACHE_NAME = 'mech-api-v1.4.0';
+const CACHE_NAME     = 'mech-v1.5.0';   // bumped — fixed emergency contacts not rendering
+const API_CACHE_NAME = 'mech-api-v1.5.0';
 
 /* ── Assets to pre-cache on install ─────────────────────────── */
 const PRECACHE_ASSETS = [
