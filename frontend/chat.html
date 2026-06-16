@@ -52,7 +52,8 @@
 
     /* ── Conversation view overlay ── */
     #convView {
-      position:fixed; inset:0; z-index:300;
+      position:fixed; top:0; bottom:0; z-index:300;
+      width:100%;
       background:var(--bg-deep);
       background-image:
         radial-gradient(ellipse 60% 50% at 20% 20%, rgba(107,33,200,0.18) 0%, transparent 60%),
@@ -171,7 +172,8 @@
 
     /* ── Voice call overlay ── */
     #callOverlay {
-      position:fixed; inset:0; z-index:500;
+      position:fixed; top:0; bottom:0; z-index:500;
+      width:100%;
       background:linear-gradient(180deg,#1e0a3c 0%,#0d0018 100%);
       display:none; flex-direction:column; align-items:center; justify-content:center;
       max-width:900px; left:50%; transform:translateX(-50%);
@@ -515,6 +517,7 @@ const CS = {
   currentConvId:     null,
   currentCallUserId: null,
   currentCallId:     null,
+  isBotConv:         false,  // true when viewing the Mech Admin notification thread
   activeFilter:      'all',
   allEmerg:          [],
   callSeconds:       0,
@@ -613,15 +616,16 @@ async function loadConversations() {
 
   list.innerHTML = convs.map(c => {
     const other  = (c.participants || []).find(p => p.id !== user?.id);
-    const name   = other ? (other.full_name || other.business_name || 'User') : 'Conversation';
-    const emoji  = other?.role === 'mechanic' ? '🔧' : other?.role === 'spareshop' ? '🛒' : '👤';
+    const isBot  = c.is_admin_broadcast || other?.is_system;
+    const name   = isBot ? 'Mech Admin' : (other ? (other.full_name || other.business_name || 'User') : 'Conversation');
+    const emoji  = isBot ? '🛡️' : other?.role === 'mechanic' ? '🔧' : other?.role === 'spareshop' ? '🛒' : '👤';
     const last   = c.last_message || 'No messages yet';
     const time   = c.updated_at ? fmtTime(c.updated_at) : '';
     const online = appState()?.onlineUsers?.has(other?.id);
-    return `<div class="conv-row" onclick="openConv(${c.id},'${esc(name)}','${emoji}',${other?.id || 0})">
-      <div class="conv-avatar">
+    return `<div class="conv-row" onclick="openConv(${c.id},'${esc(name)}','${emoji}',${other?.id || 0},${isBot ? 'true' : 'false'})">
+      <div class="conv-avatar" ${isBot ? 'style="background:linear-gradient(135deg,#7c3aed,#06b6d4);"' : ''}>
         ${emoji}
-        ${online ? '<div class="conv-online-dot"></div>' : ''}
+        ${online && !isBot ? '<div class="conv-online-dot"></div>' : ''}
       </div>
       <div class="conv-meta">
         <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -646,17 +650,18 @@ document.getElementById('chatSearch').addEventListener('input', function () {
 /* ================================================================
    CONVERSATIONS — open / messages
    ================================================================ */
-async function openConv(convId, name, emoji, otherUserId) {
+async function openConv(convId, name, emoji, otherUserId, isBot) {
   CS.currentConvId     = convId;
   CS.currentCallUserId = otherUserId;
+  CS.isBotConv         = !!isBot;
 
   document.getElementById('convName').textContent        = name;
   document.getElementById('convAvatarEmoji').textContent = emoji;
   document.getElementById('convView').classList.add('open');
 
   const online = appState()?.onlineUsers?.has(otherUserId);
-  document.getElementById('convStatusDot').className = 'conv-status-dot' + (online ? ' online' : '');
-  document.getElementById('convSub').textContent     = online ? 'Online' : 'mech platform';
+  document.getElementById('convStatusDot').className = 'conv-status-dot' + (online && !isBot ? ' online' : '');
+  document.getElementById('convSub').textContent     = isBot ? 'System notifications — replies disabled' : (online ? 'Online' : 'mech platform');
 
   /* Load messages */
   const area = document.getElementById('messagesArea');
@@ -669,14 +674,36 @@ async function openConv(convId, name, emoji, otherUserId) {
   appWS()?.emit('join_conversation',  { conversation_id: convId });
   appWS()?.emit('mark_read',           { conversation_id: convId, sender_id: me()?.id });
 
-  /* Call button */
-  document.getElementById('callBtn').onclick = () => startCall(otherUserId, name, emoji);
+  /* Mech Admin conversations: hide the call button and disable the
+     reply input — these are one-way system notifications. */
+  const callBtn   = document.getElementById('callBtn');
+  const inputBar  = document.querySelector('.msg-input-bar');
+  const msgInput  = document.getElementById('msgInput');
+  if (isBot) {
+    callBtn.style.display = 'none';
+    msgInput.placeholder  = 'Replies to Mech Admin are not allowed';
+    msgInput.disabled     = true;
+    document.getElementById('sendBtn').style.opacity = '0.4';
+    document.getElementById('sendBtn').style.pointerEvents = 'none';
+    document.getElementById('attachBtn').style.display = 'none';
+    document.getElementById('micBtn').style.display = 'none';
+  } else {
+    callBtn.style.display = 'flex';
+    msgInput.placeholder  = 'Message...';
+    msgInput.disabled     = false;
+    document.getElementById('sendBtn').style.opacity = '1';
+    document.getElementById('sendBtn').style.pointerEvents = 'auto';
+    document.getElementById('attachBtn').style.display = 'flex';
+    document.getElementById('micBtn').style.display = 'flex';
+    callBtn.onclick = () => startCall(otherUserId, name, emoji);
+  }
 }
 
 document.getElementById('convBackBtn').addEventListener('click', () => {
   document.getElementById('convView').classList.remove('open');
   appWS()?.emit('leave_conversation', { conversation_id: CS.currentConvId });
   CS.currentConvId = null;
+  CS.isBotConv     = false;
   loadConversations();
 });
 
@@ -698,16 +725,65 @@ function appendMsg(data, isTmp) {
   return div;
 }
 
-/* ── Send message ── */
-function sendMessage() {
+/* ── Send message ──
+   Primary path: REST POST /api/conversations/<id>/messages — this
+   ALWAYS persists to the DB and returns the confirmed message, and
+   the backend itself emits 'new_message' to the OTHER participant
+   via WebSocket. This avoids the failure mode where the socket
+   'send_message' handler silently drops the message (e.g. if the
+   server lost track of the sender's socket id) — previously this
+   meant messages appeared to send but were never saved or delivered.
+   ── */
+/* ── Shared persistence helper ──
+   Sends `text` via REST POST /api/conversations/<id>/messages (always
+   persists to DB; backend emits 'new_message' to the other participant).
+   Used by the text input, file attach, and voice note senders alike.
+   Returns true on success, false on failure (and marks the tmp bubble
+   as failed/retryable). ── */
+async function sendLabelMessage(text, type, tmpEl) {
+  try {
+    const res = await appAPI().post(`/api/conversations/${CS.currentConvId}/messages`, {
+      message: text, type,
+    });
+    if (res.error) throw new Error(res.error);
+
+    const confirmed = res.message || {};
+    tmpEl.remove();
+    appendMsg({
+      sender_id:  confirmed.sender_id  ?? me()?.id,
+      message:    confirmed.content    ?? text,
+      created_at: confirmed.created_at,
+    });
+    loadConversations();
+    return true;
+  } catch (err) {
+    const bubble = tmpEl.querySelector('.msg-bubble');
+    if (bubble) {
+      bubble.style.opacity = '0.55';
+      bubble.insertAdjacentHTML('beforeend', '<div style="font-size:0.62rem;color:#ef4444;margin-top:2px;">⚠️ Not sent — tap to retry</div>');
+      bubble.style.cursor = 'pointer';
+      bubble.onclick = () => { tmpEl.remove(); sendLabelMessage(text, type, appendMsg({ sender_id: me()?.id, message: text }, true)); };
+    }
+    console.error('[sendLabelMessage]', err);
+    return false;
+  }
+}
+
+/* ── Send text message ── */
+async function sendMessage() {
   const input = document.getElementById('msgInput');
   const text  = input.value.trim();
-  if (!text || !CS.currentConvId) return;
+  if (!text || !CS.currentConvId || CS.isBotConv) return;
   input.value = '';
-  appendMsg({ sender_id: me()?.id, message: text }, true);
-  appWS()?.sendMessage(CS.currentConvId, text);
+
+  // Optimistic bubble for instant feedback
+  const tmpEl = appendMsg({ sender_id: me()?.id, message: text }, true);
   appWS()?.emit('stop_typing', { conversation_id: CS.currentConvId });
+
+  await sendLabelMessage(text, 'text', tmpEl);
 }
+
+
 
 document.getElementById('sendBtn').addEventListener('click', sendMessage);
 document.getElementById('msgInput').addEventListener('keydown', e => {
@@ -731,15 +807,16 @@ document.getElementById('attachBtn').addEventListener('click', () => {
   const inp   = document.createElement('input');
   inp.type    = 'file';
   inp.accept  = 'image/*,video/*,audio/*,.pdf';
-  inp.onchange = () => {
+  inp.onchange = async () => {
     if (!inp.files[0]) return;
     const label = `📎 ${inp.files[0].name}`;
-    appendMsg({ sender_id: me()?.id, message: label }, true);
-    appWS()?.sendMessage(CS.currentConvId, label, 'file');
-    toast('File shared in chat');
+    const tmpEl = appendMsg({ sender_id: me()?.id, message: label }, true);
+    const ok = await sendLabelMessage(label, 'file', tmpEl);
+    if (ok) toast('File shared in chat');
   };
   inp.click();
 });
+
 
 /* ── Voice recording ── */
 const micBtn = document.getElementById('micBtn');
@@ -753,7 +830,7 @@ micBtn.addEventListener('click', async () => {
     CS.recordingChunks  = [];
     CS.recorder         = new MediaRecorder(CS.mediaStream);
     CS.recorder.ondataavailable = e => CS.recordingChunks.push(e.data);
-    CS.recorder.onstop = () => {
+    CS.recorder.onstop = async () => {
       CS.mediaStream.getTracks().forEach(t => t.stop());
       micBtn.classList.remove('recording');
       micBtn.textContent = '🎤';
@@ -761,9 +838,9 @@ micBtn.addEventListener('click', async () => {
       const blob = new Blob(CS.recordingChunks, { type: 'audio/webm' });
       const dur  = Math.round(blob.size / 4000);
       const label = `🎤 Voice note (${dur}s)`;
-      appendMsg({ sender_id: me()?.id, message: label }, true);
-      appWS()?.sendMessage(CS.currentConvId, label, 'voice');
-      toast('🎤 Voice note sent');
+      const tmpEl = appendMsg({ sender_id: me()?.id, message: label }, true);
+      const ok = await sendLabelMessage(label, 'voice', tmpEl);
+      if (ok) toast('🎤 Voice note sent');
     };
     CS.recorder.start();
     micBtn.classList.add('recording');
@@ -1043,7 +1120,13 @@ function wireSocket() {
   if (!socket) return;
 
   socket.on('new_message', data => {
-    if (data.conversation_id === CS.currentConvId) appendMsg(data);
+    // Messages we send ourselves are persisted + rendered via the REST
+    // path in sendLabelMessage() — only render here for messages from
+    // the OTHER participant (which is all the backend ever emits to us
+    // for someone else's message, but guard anyway in case of races).
+    if (data.conversation_id === CS.currentConvId && data.sender_id !== me()?.id) {
+      appendMsg(data);
+    }
     loadConversations();
   });
 
@@ -1100,17 +1183,46 @@ async function chatPageInit() {
   /* Socket wired after connect (small delay for socket handshake) */
   setTimeout(wireSocket, 800);
 
-  /* Home nav — role-aware dashboard target */
+  /* Home nav — role-aware dashboard target.
+     Read role from multiple sources in priority order:
+     1. app.js State.role (set by Auth.init())
+     2. mech_role in localStorage (JSON-encoded string)
+     3. mech_user.role in localStorage (full user object)
+     Falls back to index.html only if all three are unavailable. */
   const roleDashMap = {
     driver:    'dashboard_driver.html',
     mechanic:  'dashboard_mechanic.html',
     spareshop: 'dashboard_spareshop.html',
     admin:     'dashboard_admin.html',
   };
+
+  function getUserRole() {
+    // Source 1: State (populated by Auth.init())
+    if (app.State?.role) return app.State.role;
+    // Source 2: mech_role key
+    try {
+      const r = JSON.parse(localStorage.getItem('mech_role'));
+      if (r) return r;
+    } catch (_) {}
+    // Source 3: role field inside mech_user object
+    try {
+      const u = JSON.parse(localStorage.getItem('mech_user'));
+      if (u?.role) return u.role;
+    } catch (_) {}
+    return null;
+  }
+
   const homeBtn = document.getElementById('navHomeBtn');
   if (homeBtn) {
     homeBtn.addEventListener('click', () => {
-      window.location.href = roleDashMap[app.State.role] || 'index.html';
+      const role = getUserRole();
+      const target = roleDashMap[role];
+      if (target) {
+        window.location.href = target;
+      } else {
+        // Role unknown — go to index.html which will redirect based on stored auth
+        window.location.href = 'index.html';
+      }
     });
   }
 

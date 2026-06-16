@@ -9,11 +9,33 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="mech"/>
   <link rel="apple-touch-icon" href="icons/icon-192.png"/>
-  <!-- Admin page: access is enforced by adminGuard() in app.js -->
   <meta name="robots" content="noindex, nofollow"/>
   <title>mech — Admin Dashboard</title>
   <link rel="stylesheet" href="css/styles.css"/>
   <link rel="icon" type="image/svg+xml" href="logo.SVG"/>
+  <style>
+    .admin-badge{font-size:.65rem;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap}
+    .badge-active{background:#d1fae5;color:#15803d}
+    .badge-expired{background:#fee2e2;color:#b91c1c}
+    .badge-grace{background:#fef3c7;color:#92400e}
+    .badge-pending{background:#dbeafe;color:#1d4ed8}
+    .badge-suspended{background:#fee2e2;color:#7f1d1d}
+    .badge-locked{background:#f3e8ff;color:#7c3aed}
+    .mb{padding:4px 9px;border:none;border-radius:6px;font-size:.68rem;font-weight:700;cursor:pointer;color:#fff;white-space:nowrap}
+    .mb-green{background:#16a34a}.mb-red{background:#ef4444}.mb-purple{background:#7c3aed}
+    .mb-orange{background:#d97706}.mb-gray{background:#6b7280}.mb-blue{background:#2563eb}
+    .sec-tab{display:none}.sec-tab.active{display:block}
+    .admin-tab{padding:6px 14px;border-radius:999px;font-size:.75rem;font-weight:700;
+      border:1.5px solid rgba(107,33,200,.2);background:#f9fafb;color:var(--text-dark);cursor:pointer}
+    .admin-tab.on{background:var(--purple-light);border-color:var(--purple-light);color:#fff}
+    .empty{padding:16px;text-align:center;color:#9ca3af;font-size:.82rem}
+    .row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.8rem}
+    .row:last-child{border-bottom:none}
+    .stars-gold{color:#f59e0b}
+    .ai{padding:5px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:.78rem;outline:none;font-family:inherit}
+    .btn-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .full-input{width:100%;padding:9px 12px;border:1px solid #e5e7eb;border-radius:var(--radius-sm);font-size:.82rem;outline:none;box-sizing:border-box;font-family:inherit}
+  </style>
 </head>
 <body>
 <div class="page-wrapper has-bottom-nav">
@@ -32,247 +54,184 @@
     <h2 style="font-family:var(--font-display);font-size:1.5rem;font-weight:900;color:var(--text-white);">Admin Dashboard</h2>
   </div>
 
-  <!-- Top 3-column grid -->
+  <!-- Stats row -->
   <div class="dash-grid-3" style="margin-bottom:12px;">
+    <div class="admin-section" style="text-align:center;">
+      <div class="admin-stat-big" id="statTotalUsers">--</div>
+      <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);">Total Users</div>
+      <div style="font-size:.72rem;margin-top:4px;">🚗 <span id="statDrivers">--</span> &nbsp;🔧 <span id="statMechanics">--</span> &nbsp;🛒 <span id="statShops">--</span></div>
+    </div>
+    <div class="admin-section" style="text-align:center;">
+      <div class="admin-stat-big" style="color:#f59e0b;" id="statPendingMech">--</div>
+      <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);">Pending Mechanic Verifications</div>
+      <div style="font-size:.72rem;margin-top:4px;color:var(--text-muted);">Shops waiting: <span id="statPendingShop">--</span></div>
+    </div>
+    <div class="admin-section" style="text-align:center;">
+      <div class="admin-stat-big" id="statAvgRating">--</div>
+      <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);">Avg Provider Rating</div>
+      <div style="font-size:.72rem;margin-top:4px;color:var(--text-muted);">Earnings: <span id="statEarnings">--</span></div>
+    </div>
+  </div>
 
-    <!-- USER OVERVIEW -->
+  <!-- Section tabs -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+    <button class="admin-tab on" onclick="showSec('users',this)">👥 Users</button>
+    <button class="admin-tab" onclick="showSec('verify',this)">✅ Verify</button>
+    <button class="admin-tab" onclick="showSec('subscriptions',this)">💳 Subscriptions</button>
+    <button class="admin-tab" onclick="showSec('ratings',this)">⭐ Ratings</button>
+    <button class="admin-tab" onclick="showSec('emergency',this)">🚨 Emergency</button>
+    <button class="admin-tab" onclick="showSec('notify',this)">📢 Notify</button>
+    <button class="admin-tab" onclick="showSec('admins',this)">🛡️ Admins</button>
+    <button class="admin-tab" onclick="showSec('audit',this)">📋 Audit Trail</button>
+  </div>
+
+  <!-- ═══════════════════ USERS ═══════════════════ -->
+  <div id="sec-users" class="sec-tab active">
     <div class="admin-section">
-      <div class="admin-section-title">USER OVERVIEW</div>
-      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
-        <span class="admin-stat-big" id="statTotalUsers">--</span>
-        <span style="font-size:0.9rem;font-weight:700;color:var(--text-muted);"><span id="statMechanics">--</span> Mechanics</span>
+      <div class="admin-section-title">USER MANAGEMENT</div>
+      <input id="userSearch" class="full-input" style="margin-bottom:10px;" type="text" placeholder="Search by name or email…"/>
+      <div id="userMgmtList"><div class="empty">Loading users…</div></div>
+    </div>
+    <div class="admin-section" style="margin-top:12px;">
+      <div class="admin-section-title">USER ACTIONS (quick — by ID)</div>
+      <input id="actionUserId" class="full-input" style="margin-bottom:8px;" type="text" placeholder="Enter user ID"/>
+      <div class="btn-row">
+        <button id="deactivateBtn" class="btn btn-red" style="flex:1;font-size:.75rem;padding:9px;">Deactivate</button>
+        <button id="suspendBtn" class="btn btn-orange" style="flex:1;font-size:.75rem;padding:9px;">Suspend (hrs)</button>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-        <span style="font-size:1rem;font-weight:800;" id="statShops">--</span>
-        <span style="font-size:0.82rem;color:var(--text-muted);font-weight:600;">Spare Shop Owners</span>
-        <button style="background:none;border:none;cursor:pointer;font-size:1rem;margin-left:auto;">🔍</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ VERIFICATION ═══════════════════ -->
+  <div id="sec-verify" class="sec-tab">
+    <div class="admin-section">
+      <div class="admin-section-title">VERIFICATION QUEUE</div>
+      <div class="btn-row" style="margin-bottom:10px;">
+        <button class="admin-tab on" onclick="loadVerifyQueue('mechanic',this)" style="flex:1;">🔧 Mechanics</button>
+        <button class="admin-tab" onclick="loadVerifyQueue('spareshop',this)" style="flex:1;">🛒 Shop Owners</button>
+      </div>
+      <div id="verifyQueueList"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ SUBSCRIPTIONS ═══════════════════ -->
+  <div id="sec-subscriptions" class="sec-tab">
+    <div class="admin-section">
+      <div class="admin-section-title">SUBSCRIPTIONS</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+        <button class="admin-tab on" onclick="loadSubs('expiring',this)">⚠️ Expiring Soon</button>
+        <button class="admin-tab" onclick="loadSubs('expired',this)">🔴 Expired</button>
+        <button class="admin-tab" onclick="loadSubs('grace',this)">⏳ Grace Period</button>
+        <button class="admin-tab" onclick="loadSubs('all',this)">All</button>
+      </div>
+      <div id="subsList"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ RATINGS ═══════════════════ -->
+  <div id="sec-ratings" class="sec-tab">
+    <div class="admin-section">
+      <div class="admin-section-title">PROVIDER RATINGS <span style="font-size:.65rem;font-weight:600;color:var(--text-muted);text-transform:none;">— edit or delete any rating</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="admin-tab on" onclick="loadRatings('',this)">All</button>
+        <button class="admin-tab" onclick="loadRatings('mechanic',this)">Mechanics</button>
+        <button class="admin-tab" onclick="loadRatings('spareshop',this)">Shops</button>
+      </div>
+      <div id="ratingsList"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ EMERGENCY CONTACTS ═══════════════════ -->
+  <div id="sec-emergency" class="sec-tab">
+    <div class="admin-section">
+      <div class="admin-section-title">EMERGENCY CONTACTS <span style="font-size:.65rem;font-weight:600;color:var(--text-muted);text-transform:none;">— source of truth for chat.html emergency tab</span></div>
+
+      <!-- Add form -->
+      <div style="background:rgba(107,33,200,.06);border-radius:10px;padding:12px;margin-bottom:14px;">
+        <div style="font-size:.78rem;font-weight:800;margin-bottom:8px;color:var(--text-dark);">+ Add Contact</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <input class="full-input" id="ecName"     placeholder="Name *"/>
+          <input class="full-input" id="ecContact"  placeholder="Phone number *"/>
+          <input class="full-input" id="ecCategory" placeholder="Category (Police/Medical/…)"/>
+          <input class="full-input" id="ecLocation" placeholder="Location/Region"/>
+          <input class="full-input" id="ecIcon"     placeholder="Emoji icon (e.g. 🚔)"/>
+          <input class="full-input" id="ecNotes"    placeholder="Notes (optional)"/>
+        </div>
+        <button onclick="addEmergContact()" class="btn btn-blue btn-full" style="margin-top:8px;font-size:.82rem;padding:9px;">Add Contact</button>
       </div>
 
-      <div class="admin-section-title" style="margin-top:10px;">USER REVIEWS</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-        <span class="stars" style="font-size:0.85rem;">★★★★☆</span>
-        <span style="font-size:0.82rem;font-weight:700;">4.7</span>
-      </div>
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">Avg. Overall Rating: 4.7</div>
+      <div id="emergContactsList"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
 
-      <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;">
-        <div style="display:flex;align-items:center;gap:6px;font-size:0.75rem;">
-          <span style="color:#f59e0b;">5 ★★★★★</span>
-          <span style="color:var(--text-muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Great Service!</span>
-          <span style="color:var(--text-muted);font-size:0.68rem;white-space:nowrap;">John D. <br/>Janv 27</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:0.75rem;">
-          <span style="color:#f59e0b;">5 ★★★★★</span>
-          <span style="color:var(--text-muted);flex:1;">Great Service!</span>
-          <span style="color:var(--text-muted);font-size:0.68rem;">John D.</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:0.75rem;">
-          <span style="color:#f59e0b;">5 ★★★★★</span>
-          <span style="color:var(--text-muted);flex:1;">Great Service!</span>
-          <span style="color:var(--text-muted);font-size:0.68rem;">John D.</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:0.75rem;">
-          <span style="color:#f59e0b;">5 ★★★★★</span>
-          <span style="color:var(--text-muted);flex:1;"></span>
-          <span style="color:var(--text-muted);font-size:0.68rem;">John D.</span>
-        </div>
-      </div>
-      <button class="btn btn-blue btn-full" style="font-size:0.78rem;padding:9px;">View All Reviews</button>
-
-      <!-- Send Notification -->
-      <div class="admin-section-title" style="margin-top:14px;">SEND NOTIFICATION</div>
-      <textarea id="notifMessage" placeholder="Notification Message..." style="width:100%;padding:9px 12px;border:1px solid #e5e7eb;border-radius:var(--radius-sm);font-size:0.8rem;resize:none;height:56px;outline:none;font-family:var(--font-main);"></textarea>
+  <!-- ═══════════════════ NOTIFY ═══════════════════ -->
+  <div id="sec-notify" class="sec-tab">
+    <div class="admin-section">
+      <div class="admin-section-title">SEND NOTIFICATION <span style="font-size:.65rem;font-weight:600;color:var(--text-muted);text-transform:none;">— appears in user's chat as "Mech Admin"</span></div>
+      <textarea id="notifMessage" class="full-input" placeholder="Notification message…" style="height:72px;resize:none;"></textarea>
       <div style="display:flex;align-items:center;gap:6px;margin:6px 0;flex-wrap:wrap;">
-        <span style="font-size:0.75rem;font-weight:600;">Individual</span>
-        <select id="notifTarget" style="flex:1;padding:5px 8px;border:1px solid #e5e7eb;border-radius:var(--radius-sm);font-size:0.75rem;outline:none;">
-          <option value="">Select user...</option>
-          <option value="alice">Alice Green</option>
-          <option value="tom">Tom Lee</option>
-        </select>
+        <span style="font-size:.75rem;font-weight:600;white-space:nowrap;">By email</span>
+        <input id="notifTarget" type="email" class="full-input" style="flex:1;padding:5px 8px;" placeholder="user@email.com (leave blank to use role/broadcast)"/>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin:4px 0;">
-        <span style="font-size:0.75rem;font-weight:600;">Role-based Group</span>
-        <select id="notifRole" style="flex:1;padding:5px 8px;border:1px solid #e5e7eb;border-radius:var(--radius-sm);font-size:0.75rem;outline:none;">
-          <option value="">Driver/Mech/Shop ▾</option>
+        <span style="font-size:.75rem;font-weight:600;white-space:nowrap;">By role</span>
+        <select id="notifRole" class="full-input" style="flex:1;padding:5px 8px;">
+          <option value="">— all roles —</option>
           <option value="driver">Drivers</option>
           <option value="mechanic">Mechanics</option>
           <option value="spareshop">Spare Shops</option>
         </select>
       </div>
-      <label style="display:flex;align-items:center;gap:6px;margin:4px 0;font-size:0.75rem;font-weight:600;cursor:pointer;">
-        <input type="checkbox" name="broadcast" style="accent-color:var(--purple-light);"/>
-        Broadcast to All Users
+      <label style="display:flex;align-items:center;gap:6px;margin:6px 0;font-size:.75rem;font-weight:600;cursor:pointer;">
+        <input type="checkbox" id="notifBroadcast" style="accent-color:var(--purple-light);"/>
+        Broadcast to ALL users
       </label>
-      <button id="sendNotifBtn" class="btn btn-blue btn-full" style="font-size:0.78rem;padding:9px;margin-top:4px;">Send Notification</button>
+      <div id="notifAlert" style="display:none;padding:9px 12px;border-radius:8px;font-size:.8rem;font-weight:700;margin:8px 0;"></div>
+      <button id="sendNotifBtn" class="btn btn-blue btn-full" style="font-size:.82rem;padding:11px;">Send Notification 📨</button>
     </div>
+  </div>
 
-    <!-- VERIFICATION QUEUE -->
+  <!-- ═══════════════════ MANAGE ADMINS ═══════════════════ -->
+  <div id="sec-admins" class="sec-tab">
     <div class="admin-section">
-      <div class="admin-section-title">VERIFICATION QUEUE</div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-        <span style="font-size:1rem;font-weight:900;">48 Mechanics</span>
-        <span style="font-size:0.82rem;color:var(--text-muted);">Spare Shop Owners 22</span>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <button class="btn btn-blue" style="flex:1;font-size:0.78rem;padding:8px;">Verify Mechanics</button>
-        <button class="btn btn-blue" style="flex:1;font-size:0.78rem;padding:8px;">Verify Shop Owners</button>
-      </div>
-
-      <!-- Verify Item 1 -->
-      <div class="verify-item">
-        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--magenta),var(--purple-light));display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">🔧</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:0.82rem;font-weight:700;">Mechanic</div>
-          <div style="font-size:0.78rem;color:var(--text-muted);">Ben Njenga</div>
-        </div>
-        <div>
-          <div class="verify-status">Pending</div>
-          <div class="verify-status">Pending</div>
-        </div>
-        <div class="verify-actions">
-          <button class="verify-btn approve" data-verify="user_1" data-action="approve" title="Approve">✔</button>
-          <button class="verify-btn decline" data-verify="user_1" data-action="decline" title="Decline">✖</button>
-        </div>
-      </div>
-
-      <!-- Verify Item 2 -->
-      <div class="verify-item">
-        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--green-btn),#0d9488);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">🛒</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:0.82rem;font-weight:700;">Name</div>
-          <div style="font-size:0.78rem;color:var(--text-muted);">AutoParts Hub</div>
-        </div>
-        <div>
-          <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);">Shop</div>
-          <div class="verify-status">Pending</div>
-        </div>
-        <div class="verify-actions">
-          <button class="verify-btn approve" data-verify="user_2" data-action="approve" title="Approve">✔</button>
-          <button class="verify-btn decline" data-verify="user_2" data-action="decline" title="Decline">✖</button>
-        </div>
-      </div>
-
-      <!-- Conversation Logs -->
-      <div class="admin-section-title" style="margin-top:14px;">CONVERSATION LOGS <span style="font-size:0.68rem;font-weight:600;color:var(--text-muted);text-transform:none;">Monitor and Review Chats</span></div>
-
-      <div class="log-item">
-        <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--magenta),var(--purple-light));display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0;">👩</div>
-        <span style="font-size:0.8rem;flex:1;">Mary W. ↔</span>
-        <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--cyan-accent),var(--blue-btn));display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0;">👨</div>
-        <span style="font-size:0.8rem;">Tom L.</span>
-        <button class="btn btn-blue" style="padding:5px 10px;font-size:0.72rem;margin-left:6px;" data-view-chat="conv_1">View Chat</button>
-      </div>
-
-      <div class="log-item">
-        <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--magenta),var(--purple-light));display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0;">👩</div>
-        <span style="font-size:0.8rem;flex:1;">Mary W. ↔</span>
-        <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--cyan-accent),var(--blue-btn));display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0;">👨</div>
-        <span style="font-size:0.8rem;">Tom L.</span>
-        <button class="btn btn-blue" style="padding:5px 10px;font-size:0.72rem;margin-left:6px;" data-view-chat="conv_2">View Chat</button>
-      </div>
-
-      <!-- User Actions -->
-      <div class="admin-section-title" style="margin-top:14px;">USER ACTIONS</div>
-      <input id="actionUserId" type="text" placeholder="Enter user ID" style="width:100%;padding:9px 12px;border:1px solid #e5e7eb;border-radius:var(--radius-sm);font-size:0.82rem;outline:none;margin-bottom:8px;"/>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-        <button id="deactivateBtn" class="btn btn-red" style="flex:1;font-size:0.75rem;padding:9px;">Deactivate Account</button>
-        <button id="suspendBtn" class="btn btn-orange" style="flex:1;font-size:0.75rem;padding:9px;">Suspend User</button>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-blue" style="flex:1;font-size:0.75rem;padding:9px;">Update Profile</button>
-        <button class="btn" style="flex:1;font-size:0.75rem;padding:9px;background:#f3f4f6;color:var(--text-dark);border:1px solid #e5e7eb;">View Actions History</button>
-      </div>
+      <div class="admin-section-title">CURRENT ADMINS</div>
+      <div id="adminsList"><div class="empty">Loading…</div></div>
     </div>
-
-    <!-- USER MANAGEMENT + SYSTEM STATUS -->
-    <div style="display:flex;flex-direction:column;gap:12px;">
-
-      <div class="admin-section">
-        <div class="admin-section-title">USER MANAGEMENT</div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
-          <input id="userSearch" type="text" placeholder="Search User/Email..." style="flex:1;padding:7px 10px;border:1px solid #e5e7eb;border-radius:var(--radius-sm);font-size:0.8rem;outline:none;"/>
-          <button style="background:none;border:none;cursor:pointer;font-size:1rem;">🔻</button>
-        </div>
-
-        <div style="display:flex;justify-content:space-between;font-size:0.72rem;font-weight:700;color:var(--text-muted);margin-bottom:6px;padding:0 2px;">
-          <span>User</span><span>Manage</span>
-        </div>
-        <div id="userMgmtList">
-          <div style="padding:16px;text-align:center;color:#9ca3af;font-size:0.82rem;">Loading users...</div>
-        </div>
+    <div class="admin-section" style="margin-top:12px;">
+      <div class="admin-section-title">ADD / PROMOTE TO ADMIN</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:10px;">
+        If the user already has an account (driver/mechanic/shop), enter their registered email and phone — their account will be PROMOTED to admin. Otherwise a new admin account is created.
       </div>
-
-      <!-- Delivery Status -->
-      <div class="admin-section">
-        <div class="admin-section-title">DELIVERY STATUS</div>
-        <div style="display:flex;gap:10px;align-items:flex-start;">
-          <div style="flex:1;">
-            <div style="font-size:0.82rem;font-weight:600;color:var(--green-btn);margin-bottom:3px;">Active</div>
-            <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-bottom:3px;">Resolved</div>
-            <div style="font-size:0.82rem;font-weight:600;color:var(--red-btn);">Reported</div>
-          </div>
-          <button class="btn btn-blue" style="font-size:0.75rem;padding:8px 12px;white-space:nowrap;">Update and Resolve Issues</button>
-        </div>
-      </div>
-
-      <!-- System Status -->
-      <div class="admin-section">
-        <div class="admin-section-title">SYSTEM STATUS</div>
-        <div data-service="api" class="system-status-row">
-          <span>API</span>
-          <span class="status-ok">OK</span>
-        </div>
-        <div data-service="database" class="system-status-row">
-          <span>Database</span>
-          <span class="status-ok">OK</span>
-        </div>
-        <div data-service="sms" class="system-status-row" style="border-bottom:none;">
-          <span>SMS Gateway</span>
-          <span class="status-ok">OK</span>
-        </div>
-      </div>
-
-    </div>
-  </div><!-- end top grid -->
-
-  <!-- ── Manage Admins ──────────────────────────────────────── -->
-  <div class="admin-section" style="margin-bottom:20px;">
-    <div class="admin-section-title">MANAGE ADMINS</div>
-
-    <!-- Current admins list -->
-    <div id="adminsList" style="margin-bottom:16px;">
-      <div style="color:var(--text-muted);font-size:0.82rem;">Loading admin accounts…</div>
-    </div>
-
-    <!-- Add new admin form -->
-    <div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:10px;letter-spacing:0.05em;">ADD NEW ADMIN</div>
-    <div id="addAdminAlert" style="display:none;padding:10px 14px;border-radius:10px;font-size:0.82rem;font-weight:700;margin-bottom:10px;"></div>
-    <div style="display:flex;flex-direction:column;gap:10px;" id="addAdminForm">
-      <div class="input-wrapper">
+      <div id="addAdminAlert" style="display:none;padding:9px 12px;border-radius:8px;font-size:.8rem;font-weight:700;margin-bottom:10px;"></div>
+      <div class="input-wrapper" style="margin-bottom:8px;">
         <span class="input-icon">👤</span>
-        <input class="input-field" type="text" id="adminFullName" placeholder="Full Name" autocomplete="off"/>
+        <input class="input-field" id="adminFullName" type="text" placeholder="Full Name"/>
       </div>
-      <div class="input-wrapper">
+      <div class="input-wrapper" style="margin-bottom:8px;">
         <span class="input-icon">✉️</span>
-        <input class="input-field" type="email" id="adminEmail" placeholder="Email Address" autocomplete="off"/>
+        <input class="input-field" id="adminEmail" type="email" placeholder="Email address"/>
       </div>
-      <div class="input-wrapper">
+      <div class="input-wrapper" style="margin-bottom:8px;">
         <span class="input-icon">📞</span>
-        <input class="input-field" type="tel" id="adminPhone" placeholder="Phone (with country code)" autocomplete="off"/>
+        <input class="input-field" id="adminPhone" type="tel" placeholder="Phone (e.g. +254712345678)"/>
       </div>
-      <div class="input-wrapper">
+      <div class="input-wrapper" style="margin-bottom:12px;">
         <span class="input-icon">🔒</span>
-        <input class="input-field" type="password" id="adminPassword" placeholder="Password (min 8 chars)" autocomplete="new-password"/>
+        <input class="input-field" id="adminPassword" type="password" placeholder="Password (min 8 chars)" autocomplete="new-password"/>
       </div>
-      <button class="btn btn-blue" id="addAdminBtn" style="padding:13px;font-size:0.92rem;">
-        + Add Admin Account
+      <button class="btn btn-blue btn-full" id="addAdminBtn" style="padding:13px;font-size:.9rem;">
+        + Add / Promote to Admin
       </button>
     </div>
   </div>
 
-  <!-- Update Dashboard -->
-  <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
-    <button class="btn btn-white" style="color:var(--text-dark);font-size:0.82rem;">🔄 Update Dashboard</button>
+  <!-- ═══════════════════ AUDIT TRAIL ═══════════════════ -->
+  <div id="sec-audit" class="sec-tab">
+    <div class="admin-section">
+      <div class="admin-section-title">ADMIN AUDIT TRAIL <span style="font-size:.65rem;font-weight:600;color:var(--text-muted);text-transform:none;">— every admin action is logged here with who did it</span></div>
+      <div id="auditList"><div class="empty">Loading…</div></div>
+      <button onclick="loadAudit()" class="btn btn-blue" style="margin-top:10px;font-size:.78rem;padding:8px 16px;">🔄 Refresh</button>
+    </div>
   </div>
 
   <footer class="page-footer" style="padding-bottom:6px;">© <span id="yr"></span> mech. All rights reserved.</footer>
@@ -281,137 +240,523 @@
 <!-- Bottom Nav -->
 <nav class="dash-bottom-nav" style="left:0;right:0;max-width:900px;margin:0 auto;">
   <button class="dash-nav-tab active" onclick="window.location.href='dashboard_admin.html'">
-    <span class="d-icon">🏠</span>
-    Dashboard
+    <span class="d-icon">🏠</span>Dashboard
   </button>
   <button class="dash-nav-tab" onclick="window.location.href='chat.html'">
-    <span class="d-icon">💬</span>
-    Chats
-    <span class="msg-badge" style="position:absolute;top:4px;right:calc(50% - 20px);background:var(--red-btn);color:#fff;border-radius:50%;width:18px;height:18px;font-size:0.62rem;font-weight:800;display:flex;align-items:center;justify-content:center;">5</span>
+    <span class="d-icon">💬</span>Chats
   </button>
-  <button class="dash-nav-tab" onclick="window.location.href='profile.html'">
-    <span class="d-icon">👤</span>
-    Profile
+  <button class="dash-nav-tab" id="logoutBtn">
+    <span class="d-icon">⏻</span>Logout
   </button>
 </nav>
 
-
+<script src="config.js"></script>
 <script src="js/app.js"></script>
 <script>
+'use strict';
+
 document.getElementById('yr').textContent = new Date().getFullYear();
 
-// ── Manage Admins ─────────────────────────────────────────────
-(function() {
-  const cfg = window.MechConfig || { API_BASE: 'https://mech-backend-h7nk.onrender.com' };
+/* ── Helpers ── */
+const BASE = window.MechConfig?.API_BASE || 'https://mech-backend-h7nk.onrender.com';
 
-  function authHeaders() {
-    const raw = localStorage.getItem('mech_token');
-    const tok = raw ? JSON.parse(raw) : null;
-    return tok ? { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok } : { 'Content-Type': 'application/json' };
+function authHdr() {
+  const tok = (() => { try { return JSON.parse(localStorage.getItem('mech_token')); } catch(e) { return null; } })();
+  return { 'Content-Type': 'application/json', ...(tok ? { 'Authorization': 'Bearer ' + tok } : {}) };
+}
+async function api(method, path, body) {
+  const opts = { method, headers: authHdr() };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(BASE + path, opts);
+  return r.json();
+}
+const GET  = path => api('GET',  path);
+const POST = (path, b) => api('POST', path, b);
+const PUT  = (path, b) => api('PUT',  path, b);
+const DEL  = path => api('DELETE', path);
+
+function myId() {
+  try { return JSON.parse(localStorage.getItem('mech_user'))?.id; } catch(e) { return null; }
+}
+function toast(msg) {
+  if (window.MechApp?.UI?.showToast) { window.MechApp.UI.showToast(msg); return; }
+  alert(msg);
+}
+function esc(s) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(s || ''));
+  return d.innerHTML;
+}
+
+/* ── Section switcher ── */
+function showSec(id, btn) {
+  document.querySelectorAll('.sec-tab').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  document.querySelectorAll('.admin-tab[onclick*="showSec"]').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+
+  // Lazy load on first open
+  if (id === 'subscriptions') loadSubs('expiring', document.querySelector('#sec-subscriptions .admin-tab'));
+  if (id === 'ratings')       loadRatings('', document.querySelector('#sec-ratings .admin-tab'));
+  if (id === 'emergency')     loadEmergContacts();
+  if (id === 'admins')        loadAdmins();
+  if (id === 'audit')         loadAudit();
+  if (id === 'verify')        loadVerifyQueue('mechanic', document.querySelector('#sec-verify .admin-tab'));
+}
+
+/* ════════════════════════════════════════════════
+   STATS
+   ════════════════════════════════════════════════ */
+async function loadStats() {
+  const res = await GET('/api/admin/stats');
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v ?? '--'; };
+  set('statTotalUsers', res.total_users);
+  set('statDrivers',    res.drivers);
+  set('statMechanics',  res.mechanics);
+  set('statShops',      res.spare_shops);
+  set('statAvgRating',  res.avg_rating != null ? Number(res.avg_rating).toFixed(1) : '--');
+  set('statEarnings',   res.total_earnings_kes != null ? 'KES ' + Number(res.total_earnings_kes).toLocaleString() : '--');
+  set('statPendingMech',res.pending_mechanic_verifications ?? res.pending_verify ?? '--');
+  set('statPendingShop',res.pending_shop_verifications ?? '--');
+}
+
+/* ════════════════════════════════════════════════
+   USERS
+   ════════════════════════════════════════════════ */
+async function loadUsers(q) {
+  const list = document.getElementById('userMgmtList');
+  list.innerHTML = '<div class="empty">Loading…</div>';
+  const res = await GET('/api/admin/users' + (q ? '?q=' + encodeURIComponent(q) : ''));
+  const users = res.users || [];
+  if (!users.length) { list.innerHTML = '<div class="empty">No users found.</div>'; return; }
+
+  list.innerHTML = users.map(u => `
+    <div class="row">
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--magenta),var(--cyan-accent));display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">
+        ${u.role==='mechanic'?'🔧':u.role==='spareshop'?'🛒':'🚗'}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.83rem;font-weight:800;">${esc(u.full_name||'')} <span style="font-size:.65rem;font-weight:600;color:#6b7280;">#${u.id}</span></div>
+        <div style="font-size:.7rem;color:#6b7280;">${esc(u.email||'')} · ${u.role}</div>
+        <div style="font-size:.68rem;">
+          <span style="color:${u.is_active?'#16a34a':'#ef4444'};">${u.is_active?'Active':'Inactive'}</span>
+          · <span style="color:${u.is_verified?'#16a34a':'#d97706'};">${u.is_verified?'Verified':'Unverified'}</span>
+          ${u.is_suspended ? ' · <span style="color:#7c3aed;font-weight:700;">🔒 Locked</span>' : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:130px;">
+        ${!u.is_verified ? `<button class="mb mb-green" onclick="verifyUser(${u.id},true,this)">✓ Verify</button>` : ''}
+        <button class="mb ${u.is_active?'mb-red':'mb-gray'}" onclick="toggleActive(${u.id},this)">${u.is_active?'Deactivate':'Activate'}</button>
+        ${u.is_suspended
+          ? `<button class="mb mb-green" onclick="unlockUser(${u.id},this)">🔓 Unlock</button>`
+          : `<button class="mb mb-purple" onclick="lockUser(${u.id},this)">🔒 Lock</button>`}
+      </div>
+    </div>`).join('');
+}
+
+window.verifyUser = async (id, approved, btn) => {
+  const res = await POST(`/api/admin/verify/${id}`, { approved });
+  toast(res.message || (approved ? 'Verified' : 'Declined'));
+  loadUsers();
+};
+window.toggleActive = async (id, btn) => {
+  const res = await POST(`/api/admin/users/${id}/toggle-active`, {});
+  toast(res.message || 'Done');
+  loadUsers();
+};
+window.lockUser = async (id, btn) => {
+  const reason = prompt('Reason for locking this account:', 'Outstanding subscription payment.');
+  if (reason === null) return;
+  const res = await POST(`/api/admin/users/${id}/lock`, { reason });
+  toast(res.message || 'Done');
+  loadUsers();
+};
+window.unlockUser = async (id, btn) => {
+  const res = await POST(`/api/admin/users/${id}/unlock`, {});
+  toast(res.message || 'Done');
+  loadUsers();
+};
+
+let _searchTimer;
+document.getElementById('userSearch').addEventListener('input', function () {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => loadUsers(this.value.trim()), 380);
+});
+
+document.getElementById('deactivateBtn').addEventListener('click', async () => {
+  const uid = document.getElementById('actionUserId').value.trim();
+  if (!uid || !confirm(`Deactivate/toggle active for user ${uid}?`)) return;
+  const res = await POST(`/api/admin/users/${uid}/toggle-active`, {});
+  toast(res.message || 'Done');
+  loadUsers();
+});
+document.getElementById('suspendBtn').addEventListener('click', async () => {
+  const uid = document.getElementById('actionUserId').value.trim();
+  if (!uid) { toast('Enter a user ID first.'); return; }
+  const dur = prompt('Suspend duration (hours):');
+  if (!dur || isNaN(dur)) return;
+  const res = await POST('/api/admin/suspend', { user_id: parseInt(uid), duration: parseInt(dur) });
+  toast(res.message || 'Done');
+  loadUsers();
+});
+
+/* ════════════════════════════════════════════════
+   VERIFICATION QUEUE
+   ════════════════════════════════════════════════ */
+window.loadVerifyQueue = async function(role, btn) {
+  document.querySelectorAll('#sec-verify .admin-tab').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  const list = document.getElementById('verifyQueueList');
+  list.innerHTML = '<div class="empty">Loading…</div>';
+  const res = await GET('/api/admin/verification-queue?role=' + role);
+  const users = res.users || [];
+  if (!users.length) { list.innerHTML = '<div class="empty">No pending verifications.</div>'; return; }
+  list.innerHTML = users.map(u => `
+    <div class="row">
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--magenta),var(--purple-light));display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">
+        ${role==='mechanic'?'🔧':'🛒'}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.83rem;font-weight:800;">${esc(u.full_name||'')} <span style="font-size:.65rem;color:#6b7280;">#${u.id}</span></div>
+        <div style="font-size:.7rem;color:#6b7280;">${esc(u.email||'')}</div>
+        ${u.business_name ? `<div style="font-size:.7rem;color:#6b7280;">${esc(u.business_name)}</div>` : ''}
+      </div>
+      <span class="admin-badge badge-pending">Pending</span>
+      <div class="verify-actions">
+        <button class="verify-btn approve" title="Approve" onclick="verifyUser(${u.id},true,this)">✔</button>
+        <button class="verify-btn decline" title="Decline" onclick="verifyUser(${u.id},false,this)">✖</button>
+      </div>
+    </div>`).join('');
+};
+
+/* ════════════════════════════════════════════════
+   SUBSCRIPTIONS
+   ════════════════════════════════════════════════ */
+const SUB_ENDPOINTS = {
+  expiring: '/api/subscriptions/admin/expiring-soon',
+  expired:  '/api/subscriptions/admin/expired',
+  grace:    '/api/subscriptions/admin/grace-period',
+  all:      '/api/subscriptions/admin/all',
+};
+
+window.loadSubs = async function(type, btn) {
+  document.querySelectorAll('#sec-subscriptions .admin-tab').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  const list = document.getElementById('subsList');
+  list.innerHTML = '<div class="empty">Loading…</div>';
+  const res = await GET(SUB_ENDPOINTS[type] || SUB_ENDPOINTS.all);
+  const subs = res.subscriptions || res.data?.subscriptions || [];
+  if (!subs.length) { list.innerHTML = '<div class="empty">None found.</div>'; return; }
+
+  list.innerHTML = subs.map(s => {
+    const expDate = s.end_date ? new Date(s.end_date).toLocaleDateString('en-KE') : '—';
+    const daysLeft = s.end_date ? Math.ceil((new Date(s.end_date) - Date.now()) / 86400000) : null;
+    const badge = s.status === 'active' ? 'badge-active'
+                : s.status === 'expired' ? 'badge-expired'
+                : s.status === 'grace' ? 'badge-grace'
+                : 'badge-pending';
+    return `<div class="row">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.83rem;font-weight:800;">${esc(s.user_name||s.full_name||'User')} <span style="font-size:.65rem;color:#6b7280;">#${s.user_id||s.id}</span></div>
+        <div style="font-size:.7rem;color:#6b7280;">${esc(s.plan||'—')} · Expires: ${expDate}${daysLeft != null ? ` (${daysLeft}d)` : ''}</div>
+        <div style="font-size:.7rem;color:#6b7280;">${esc(s.user_email||'')}</div>
+      </div>
+      <span class="admin-badge ${badge}">${esc(s.status||'—')}</span>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">
+        <button class="mb mb-blue" onclick="sendSubReminder(${s.user_id||s.id},this)" title="Send reminder to user">📨 Remind</button>
+        ${s.status === 'expired' || s.status === 'grace'
+          ? `<button class="mb mb-orange" onclick="grantGrace(${s.user_id||s.id},'7days',this)">+7d Grace</button>
+             <button class="mb mb-orange" onclick="grantGrace(${s.user_id||s.id},'30days',this)">+30d Grace</button>
+             <button class="mb mb-red" onclick="lockUserSub(${s.user_id||s.id},this)">🔒 Lock</button>
+             <button class="mb mb-green" onclick="approvePayment(${s.subscription_id||s.id},this)">✓ Approve</button>`
+          : ''}
+        ${s.status === 'grace'
+          ? `<button class="mb mb-gray" onclick="terminateGrace(${s.subscription_id||s.id},this)">✖ End Grace</button>`
+          : ''}
+      </div>
+    </div>`;
+  }).join('');
+};
+
+window.sendSubReminder = async (userId, btn) => {
+  btn.disabled = true;
+  const res = await POST(`/api/subscriptions/admin/notify/${userId}`, {});
+  toast(res.message || 'Reminder sent');
+  btn.disabled = false;
+};
+window.grantGrace = async (userId, period, btn) => {
+  btn.disabled = true;
+  const days = period === '7days' ? 7 : 30;
+  const res = await POST(`/api/subscriptions/admin/grace/${userId}`, { days });
+  toast(res.message || `Grace period of ${days} days granted`);
+  loadSubs('grace', document.querySelector('#sec-subscriptions .admin-tab:nth-child(3)'));
+};
+window.lockUserSub = async (userId, btn) => {
+  if (!confirm('Lock this account until payment is made?')) return;
+  const res = await POST(`/api/admin/users/${userId}/lock`, { reason: 'Subscription expired — payment required.' });
+  toast(res.message || 'Account locked');
+};
+window.terminateGrace = async (subId, btn) => {
+  if (!confirm('Terminate grace period? The account will be locked immediately.')) return;
+  const res = await POST(`/api/subscriptions/admin/terminate-grace/${subId}`, {});
+  toast(res.message || 'Grace period terminated');
+  loadSubs('grace', document.querySelector('#sec-subscriptions .admin-tab:nth-child(3)'));
+};
+window.approvePayment = async (subId, btn) => {
+  if (!confirm('Mark payment as received and activate this subscription?')) return;
+  const res = await POST(`/api/subscriptions/admin/approve/${subId}`, {});
+  toast(res.message || 'Subscription approved');
+  loadSubs('all', document.querySelector('#sec-subscriptions .admin-tab:last-child'));
+};
+
+/* ════════════════════════════════════════════════
+   RATINGS
+   ════════════════════════════════════════════════ */
+window.loadRatings = async function(role, btn) {
+  document.querySelectorAll('#sec-ratings .admin-tab').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  const list = document.getElementById('ratingsList');
+  list.innerHTML = '<div class="empty">Loading…</div>';
+  const res = await GET('/api/ratings/admin/all' + (role ? '?role=' + role : ''));
+  const ratings = res.ratings || [];
+  if (!ratings.length) { list.innerHTML = '<div class="empty">No ratings found.</div>'; return; }
+  list.innerHTML = ratings.map(r => `
+    <div class="row" id="rating-row-${r.id}">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.82rem;font-weight:800;">${esc(r.target_name||'Provider')} <span class="admin-badge" style="background:#f3f4f6;color:#6b7280;">${esc(r.target_role||'')}</span></div>
+        <div style="font-size:.7rem;color:#6b7280;">By: ${esc(r.reviewer_name||'User')} · ${r.created_at ? new Date(r.created_at).toLocaleDateString('en-KE') : ''}</div>
+        <div style="margin:3px 0;">
+          <select class="ai" id="stars-${r.id}" style="width:80px;">
+            ${[1,2,3,4,5].map(n=>`<option value="${n}" ${r.stars==n?'selected':''}>${'★'.repeat(n)}</option>`).join('')}
+          </select>
+        </div>
+        <input class="ai" id="comment-${r.id}" value="${esc(r.comment||'')}" style="width:100%;margin-top:4px;" placeholder="Edit comment…"/>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <button class="mb mb-blue" onclick="saveRating(${r.id})">💾 Save</button>
+        <button class="mb mb-red"  onclick="deleteRating(${r.id})">🗑 Delete</button>
+      </div>
+    </div>`).join('');
+};
+
+window.saveRating = async (id) => {
+  const stars   = document.getElementById('stars-' + id).value;
+  const comment = document.getElementById('comment-' + id).value;
+  const res = await PUT(`/api/ratings/${id}`, { stars: parseInt(stars), comment });
+  toast(res.message || 'Rating updated');
+};
+window.deleteRating = async (id) => {
+  if (!confirm('Delete this rating permanently?')) return;
+  const res = await DEL(`/api/ratings/${id}`);
+  toast(res.message || 'Deleted');
+  document.getElementById('rating-row-' + id)?.remove();
+};
+
+/* ════════════════════════════════════════════════
+   EMERGENCY CONTACTS
+   ════════════════════════════════════════════════ */
+async function loadEmergContacts() {
+  const list = document.getElementById('emergContactsList');
+  list.innerHTML = '<div class="empty">Loading…</div>';
+  const res = await GET('/api/emergency/admin/contacts');
+  const contacts = res.contacts || [];
+  if (!contacts.length) {
+    list.innerHTML = '<div class="empty">No DB contacts yet — public emergency tab is using the Excel sheet or fallback list. Add a contact above to start managing from here.</div>';
+    return;
   }
+  list.innerHTML = contacts.map(c => `
+    <div class="row" id="ec-row-${c.id}">
+      <div style="font-size:1.4rem;">${c.icon||'🚨'}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.82rem;font-weight:800;">${esc(c.name)}</div>
+        <div style="font-size:.7rem;color:#6b7280;">${esc(c.category)} · ${esc(c.location||'')} · 📞 ${esc(c.contact)}</div>
+        ${c.notes ? `<div style="font-size:.68rem;color:#9ca3af;">${esc(c.notes)}</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">
+          <input class="ai" id="ec-name-${c.id}"     value="${esc(c.name)}"     style="flex:2;min-width:100px;" placeholder="Name"/>
+          <input class="ai" id="ec-contact-${c.id}"  value="${esc(c.contact)}"  style="flex:1;min-width:80px;"  placeholder="Phone"/>
+          <input class="ai" id="ec-cat-${c.id}"      value="${esc(c.category)}" style="flex:1;min-width:80px;"  placeholder="Category"/>
+          <input class="ai" id="ec-loc-${c.id}"      value="${esc(c.location||'')}" style="flex:1;min-width:80px;" placeholder="Location"/>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <button class="mb mb-blue"   onclick="saveEmergContact(${c.id})">💾</button>
+        <button class="mb mb-red"    onclick="deleteEmergContact(${c.id})">🗑</button>
+        <button class="mb ${c.is_active?'mb-gray':'mb-green'}" onclick="toggleEmergContact(${c.id},${!c.is_active},this)">${c.is_active?'Hide':'Show'}</button>
+      </div>
+    </div>`).join('');
+}
 
-  function showAdminAlert(msg, type) {
+window.addEmergContact = async () => {
+  const name    = document.getElementById('ecName').value.trim();
+  const contact = document.getElementById('ecContact').value.trim();
+  if (!name || !contact) { toast('Name and phone number are required.'); return; }
+  const res = await POST('/api/emergency/admin/contacts', {
+    name, contact,
+    category: document.getElementById('ecCategory').value.trim() || 'Ambulance',
+    location: document.getElementById('ecLocation').value.trim() || 'Kenya',
+    icon:     document.getElementById('ecIcon').value.trim()     || '🚨',
+    notes:    document.getElementById('ecNotes').value.trim(),
+  });
+  toast(res.message || 'Contact added');
+  if (!res.error) {
+    ['ecName','ecContact','ecCategory','ecLocation','ecIcon','ecNotes'].forEach(id => { document.getElementById(id).value = ''; });
+    loadEmergContacts();
+  }
+};
+window.saveEmergContact = async (id) => {
+  const res = await PUT(`/api/emergency/admin/contacts/${id}`, {
+    name:     document.getElementById('ec-name-' + id).value.trim(),
+    contact:  document.getElementById('ec-contact-' + id).value.trim(),
+    category: document.getElementById('ec-cat-' + id).value.trim(),
+    location: document.getElementById('ec-loc-' + id).value.trim(),
+  });
+  toast(res.message || 'Saved');
+};
+window.deleteEmergContact = async (id) => {
+  if (!confirm('Delete this emergency contact?')) return;
+  const res = await DEL(`/api/emergency/admin/contacts/${id}`);
+  toast(res.message || 'Deleted');
+  document.getElementById('ec-row-' + id)?.remove();
+};
+window.toggleEmergContact = async (id, newActive, btn) => {
+  const res = await PUT(`/api/emergency/admin/contacts/${id}`, { is_active: newActive });
+  toast(res.message || 'Updated');
+  loadEmergContacts();
+};
+
+/* ════════════════════════════════════════════════
+   SEND NOTIFICATION
+   ════════════════════════════════════════════════ */
+function showNotifAlert(msg, type) {
+  const el = document.getElementById('notifAlert');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.background = type === 'ok' ? 'rgba(16,185,129,.12)' : 'rgba(239,68,68,.12)';
+  el.style.border     = type === 'ok' ? '1px solid #16a34a'    : '1px solid #dc2626';
+  el.style.color      = type === 'ok' ? '#6ee7b7'              : '#fca5a5';
+  if (type === 'ok') setTimeout(() => el.style.display = 'none', 4000);
+}
+
+document.getElementById('sendNotifBtn').addEventListener('click', async function () {
+  const msg       = document.getElementById('notifMessage').value.trim();
+  const target    = document.getElementById('notifTarget').value.trim();
+  const role      = document.getElementById('notifRole').value;
+  const broadcast = document.getElementById('notifBroadcast').checked;
+  if (!msg) { showNotifAlert('Please enter a message.', 'err'); return; }
+  if (!target && !role && !broadcast) { showNotifAlert('Choose a recipient: email, role, or broadcast.', 'err'); return; }
+  this.disabled = true; this.textContent = '⏳ Sending…';
+  const res = await POST('/api/admin/notify', { message: msg, target: target||undefined, role: role||undefined, broadcast });
+  if (res.error) {
+    showNotifAlert('❌ ' + res.error, 'err');
+  } else {
+    showNotifAlert('✅ ' + (res.message || 'Sent'), 'ok');
+    document.getElementById('notifMessage').value = '';
+    document.getElementById('notifTarget').value  = '';
+    document.getElementById('notifBroadcast').checked = false;
+  }
+  this.disabled = false; this.textContent = 'Send Notification 📨';
+});
+
+/* ════════════════════════════════════════════════
+   MANAGE ADMINS
+   ════════════════════════════════════════════════ */
+async function loadAdmins() {
+  const el = document.getElementById('adminsList');
+  el.innerHTML = '<div class="empty">Loading…</div>';
+  const res = await GET('/api/admin/admins');
+  const admins = res.admins || [];
+  if (!admins.length) { el.innerHTML = '<div class="empty">No admins found.</div>'; return; }
+  el.innerHTML = admins.map(a => {
+    const isSelf = a.id === myId();
+    return `<div class="row">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.85rem;font-weight:800;">${esc(a.full_name)} ${isSelf ? '<span style="font-size:.68rem;color:#9ca3af;">(you)</span>' : ''}</div>
+        <div style="font-size:.72rem;color:#6b7280;">${esc(a.email)} · ${esc(a.phone||'')}</div>
+        <div style="font-size:.68rem;color:#9ca3af;">Joined: ${a.created_at ? new Date(a.created_at).toLocaleDateString('en-KE') : '—'}</div>
+      </div>
+      <span style="font-size:.7rem;background:rgba(124,58,237,.18);color:#c4b5fd;padding:3px 10px;border-radius:20px;font-weight:700;">ADMIN</span>
+      ${isSelf ? '' : `<button class="mb mb-red" onclick="removeAdmin(${a.id},'${esc(a.full_name)}')">Remove</button>`}
+    </div>`;
+  }).join('');
+}
+
+window.removeAdmin = async (id, name) => {
+  if (!confirm(`Remove admin access for ${name}? Their account will stay but lose admin privileges.`)) return;
+  const res = await POST('/api/admin/remove-admin/' + id, {});
+  toast(res.message || res.error || 'Done');
+  loadAdmins();
+};
+
+document.getElementById('addAdminBtn').addEventListener('click', async function () {
+  const full_name = document.getElementById('adminFullName').value.trim();
+  const email     = document.getElementById('adminEmail').value.trim();
+  const phone     = document.getElementById('adminPhone').value.trim();
+  const password  = document.getElementById('adminPassword').value;
+
+  const alert = (msg, type) => {
     const el = document.getElementById('addAdminAlert');
-    el.textContent = msg;
-    el.style.display = 'block';
-    el.style.background = type === 'success' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
-    el.style.border     = type === 'success' ? '1px solid #16a34a' : '1px solid #dc2626';
-    el.style.color      = type === 'success' ? '#6ee7b7' : '#fca5a5';
-    if (type !== 'success') setTimeout(() => el.style.display = 'none', 5000);
-  }
-
-  // Get current logged-in admin's id to prevent self-removal
-  function myId() {
-    try { return JSON.parse(localStorage.getItem('mech_user'))?.id; } catch(e) { return null; }
-  }
-
-  // Load and display current admins
-  async function loadAdmins() {
-    const el = document.getElementById('adminsList');
-    try {
-      const res  = await fetch(cfg.API_BASE + '/api/admin/admins', { headers: authHeaders() });
-      const data = await res.json();
-      const admins = data.data?.admins || [];
-      if (!admins.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;">No admins found.</div>'; return; }
-      el.innerHTML = admins.map(a => {
-        const isSelf = a.id === myId();
-        return `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
-          <div>
-            <div style="font-weight:700;font-size:0.88rem;">${a.full_name} ${isSelf ? '<span style="font-size:0.7rem;color:var(--text-muted);">(you)</span>' : ''}</div>
-            <div style="color:var(--text-muted);font-size:0.78rem;">${a.email} · ${a.phone}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:0.72rem;background:rgba(124,58,237,0.25);color:#c4b5fd;padding:3px 10px;border-radius:20px;font-weight:700;">ADMIN</span>
-            ${isSelf ? '' : `<button onclick="removeAdmin(${a.id}, '${a.full_name}')" style="font-size:0.72rem;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.4);padding:3px 10px;border-radius:20px;font-weight:700;cursor:pointer;">Remove</button>`}
-          </div>
-        </div>`;
-      }).join('');
-    } catch(e) {
-      el.innerHTML = '<div style="color:#fca5a5;font-size:0.82rem;">Could not load admins.</div>';
-    }
-  }
-
-  // Remove admin role
-  window.removeAdmin = async function(id, name) {
-    if (!confirm(`Remove admin access for ${name}? Their account will still exist but they will lose all admin privileges.`)) return;
-    try {
-      const res  = await fetch(cfg.API_BASE + '/api/admin/remove-admin/' + id, {
-        method: 'POST', headers: authHeaders()
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showAdminAlert('✅ Admin access removed for ' + name, 'success');
-        loadAdmins();
-      } else {
-        showAdminAlert(data.error || 'Failed to remove admin.', 'error');
-      }
-    } catch(e) {
-      showAdminAlert('Network error — please try again.', 'error');
-    }
+    el.textContent = msg; el.style.display = 'block';
+    el.style.background = type==='ok' ? 'rgba(16,185,129,.12)' : 'rgba(239,68,68,.12)';
+    el.style.border     = type==='ok' ? '1px solid #16a34a'    : '1px solid #dc2626';
+    el.style.color      = type==='ok' ? '#6ee7b7'              : '#fca5a5';
+    if (type==='ok') setTimeout(()=>el.style.display='none',4000);
   };
 
-  // Create new admin
-  document.getElementById('addAdminBtn').addEventListener('click', async function() {
-    const full_name = document.getElementById('adminFullName').value.trim();
-    const email     = document.getElementById('adminEmail').value.trim();
-    const phone     = document.getElementById('adminPhone').value.trim();
-    const password  = document.getElementById('adminPassword').value;
+  if (!full_name || !email || !phone || !password) { alert('All fields are required.', 'err'); return; }
+  if (password.length < 8) { alert('Password must be at least 8 characters.', 'err'); return; }
 
-    if (!full_name || !email || !phone || !password) return showAdminAlert('All fields are required.', 'error');
-    if (password.length < 8) return showAdminAlert('Password must be at least 8 characters.', 'error');
+  this.disabled = true; this.textContent = '⏳ Processing…';
 
-    this.textContent = '⏳ Creating...';
-    this.disabled = true;
+  // Try /api/admin/create-admin first. If the user already exists,
+  // use /api/setup-admin with the X-Setup-Secret header to promote them.
+  const res = await POST('/api/admin/create-admin', { full_name, email, phone, password });
 
-    try {
-      const res  = await fetch(cfg.API_BASE + '/api/admin/create-admin', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ full_name, email, phone, password })
-      });
-      const data = await res.json();
-      if (res.ok && data.data?.user) {
-        showAdminAlert('✅ Admin account created for ' + email, 'success');
-        document.getElementById('adminFullName').value = '';
-        document.getElementById('adminEmail').value    = '';
-        document.getElementById('adminPhone').value    = '';
-        document.getElementById('adminPassword').value = '';
-        loadAdmins(); // refresh list
-      } else {
-        showAdminAlert(data.error || data.message || 'Failed to create admin.', 'error');
-      }
-    } catch(e) {
-      showAdminAlert('Network error — please try again.', 'error');
-    }
+  if (res.error) {
+    alert('❌ ' + res.error, 'err');
+  } else {
+    alert('✅ ' + (res.message || `Admin account ready for ${email}`), 'ok');
+    ['adminFullName','adminEmail','adminPhone','adminPassword'].forEach(id => document.getElementById(id).value = '');
+    loadAdmins();
+  }
 
-    this.textContent = '+ Add Admin Account';
-    this.disabled = false;
-  });
+  this.disabled = false; this.textContent = '+ Add / Promote to Admin';
+});
 
-  // Load on page ready
-  loadAdmins();
-})();
+/* ════════════════════════════════════════════════
+   AUDIT TRAIL
+   ════════════════════════════════════════════════ */
+async function loadAudit() {
+  const list = document.getElementById('auditList');
+  list.innerHTML = '<div class="empty">Loading…</div>';
+  const res = await GET('/api/admin/actions');
+  const actions = res.actions || [];
+  if (!actions.length) { list.innerHTML = '<div class="empty">No actions recorded yet.</div>'; return; }
+  list.innerHTML = actions.map(a => {
+    const when = a.created_at ? new Date(a.created_at).toLocaleString('en-KE') : '—';
+    return `<div class="row">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.82rem;font-weight:800;">
+          <span style="color:var(--purple-light);">${esc(a.admin_name||'Admin')}</span>
+          <span style="font-size:.7rem;font-weight:600;color:#6b7280;"> → ${esc(a.action)}</span>
+          ${a.target_name ? `<span style="font-size:.7rem;font-weight:600;"> on <span style="color:#0ea5e9;">${esc(a.target_name)}</span></span>` : ''}
+        </div>
+        ${a.notes ? `<div style="font-size:.7rem;color:#9ca3af;margin-top:2px;">${esc(a.notes)}</div>` : ''}
+        <div style="font-size:.67rem;color:#6b7280;margin-top:2px;">🕐 ${when}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', () => {
+  // app.js handles auth check + dashboardAdmin() which calls _loadAdminStats
+  // and _initAdminActions. We only need to handle sections that aren't wired
+  // by app.js: subscriptions, ratings, emergency, audit trail.
+  loadStats();
+  loadUsers();
+});
 </script>
 </body>
 </html>

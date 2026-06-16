@@ -6,8 +6,8 @@
 
 'use strict';
 
-const CACHE_NAME     = 'mech-v1.5.0';   // bumped — fixed emergency contacts not rendering
-const API_CACHE_NAME = 'mech-api-v1.5.0';
+const CACHE_NAME     = 'mech-v1.7.0';   // bumped — fixed home button role detection
+const API_CACHE_NAME = 'mech-api-v1.7.0';
 
 /* ── Assets to pre-cache on install ─────────────────────────── */
 const PRECACHE_ASSETS = [
