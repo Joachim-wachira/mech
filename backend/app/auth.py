@@ -228,7 +228,7 @@ def login():
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def me():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     user    = User.query.get_or_404(user_id)
     return success_response({"user": user.to_dict()})
 
@@ -383,7 +383,7 @@ def reset_password():
 @auth_bp.route("/change-password", methods=["POST"])
 @jwt_required()
 def change_password():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     user    = User.query.get(user_id)
     if not user:
         return error_response("User not found", 404)

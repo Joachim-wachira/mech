@@ -1,6 +1,7 @@
 """
 Mech Platform — SQLAlchemy Database Models
 """
+import os
 from datetime import datetime, timezone
 from app import db
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -26,6 +27,10 @@ class User(db.Model):
     suspended_until = db.Column(db.DateTime)
     phone_verified  = db.Column(db.Boolean, default=False)
     is_available    = db.Column(db.Boolean, default=True)
+    # System/bot account flag — used for the "Mech Admin" notification
+    # sender. Conversations involving this user are read-only for the
+    # other participant (no replies allowed).
+    is_system       = db.Column(db.Boolean, default=False)
     rating_avg      = db.Column(db.Float,   default=0.0)
     rating_count    = db.Column(db.Integer, default=0)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
@@ -74,11 +79,39 @@ class User(db.Model):
             "location_lng":  self.location_lng,
             "is_verified":   self.is_verified,
             "is_active":     self.is_active,
+            "is_suspended":  self.is_suspended,
             "is_available":  self.is_available,
+            "is_system":     self.is_system,
             "rating_avg":    self.rating_avg,
             "rating_count":  self.rating_count,
             "created_at":    self.created_at.isoformat() if self.created_at else None,
         }
+
+    # ── Mech Admin bot account ─────────────────────────────────
+    # Used as the sender for admin → user notifications that should
+    # appear inside the user's chat list. The conversation with this
+    # user is read-only for the recipient (frontend disables reply).
+    MECH_ADMIN_EMAIL = "mech-admin@system.mech"
+
+    @classmethod
+    def get_or_create_mech_admin(cls):
+        bot = cls.query.filter_by(email=cls.MECH_ADMIN_EMAIL).first()
+        if bot:
+            return bot
+        bot = cls(
+            full_name      = "Mech Admin",
+            email          = cls.MECH_ADMIN_EMAIL,
+            phone          = "0000000000",
+            role           = "admin",
+            is_verified    = True,
+            is_active      = True,
+            phone_verified = True,
+            is_system      = True,
+        )
+        bot.set_password(os.urandom(16).hex())  # random, unused — login disabled for bots
+        db.session.add(bot)
+        db.session.flush()
+        return bot
 
 
 class MechanicProfile(db.Model):
@@ -468,4 +501,41 @@ class Subscription(db.Model):
             "confirmed_at":     self.confirmed_at.isoformat()  if self.confirmed_at  else None,
             "admin_notes":      self.admin_notes,
             "created_at":       self.created_at.isoformat(),
+        }
+
+
+# ── Admin-editable emergency contacts ───────────────────────────────
+# Replaces the read-only Excel sheet as the source of truth once any
+# rows exist here. Admins manage these via /api/emergency/admin/*.
+# The public GET /api/emergency/contacts endpoint prefers this table
+# (if non-empty), falling back to the Excel sheet / hardcoded list.
+class EmergencyContact(db.Model):
+    __tablename__ = "emergency_contacts"
+
+    id          = db.Column(db.Integer, primary_key=True)
+    name        = db.Column(db.String(200), nullable=False)
+    category    = db.Column(db.String(100), nullable=False, default="Ambulance")
+    contact     = db.Column(db.String(50),  nullable=False)
+    location    = db.Column(db.String(200), default="Kenya")
+    icon        = db.Column(db.String(10),  default="🚨")
+    notes       = db.Column(db.Text, default="")
+    is_active   = db.Column(db.Boolean, default=True)
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at  = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by  = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    editor = db.relationship("User", foreign_keys=[updated_by], overlaps="editor")
+
+    def to_dict(self):
+        return {
+            "id":         self.id,
+            "name":       self.name,
+            "category":   self.category,
+            "contact":    self.contact,
+            "location":   self.location,
+            "icon":       self.icon,
+            "notes":      self.notes,
+            "is_active":  self.is_active,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "updated_by": self.updated_by,
         }

@@ -106,6 +106,30 @@ def create_app(config_object=None):
     _SKIP_DB_PATHS   = {"/health", "/"}
     _SKIP_DB_METHODS = {"OPTIONS", "HEAD"}
 
+    def _run_lightweight_migrations():
+        """
+        db.create_all() only creates tables that don't exist yet — it will
+        NOT add new columns to tables that already exist (e.g. the `users`
+        table on an existing Render deployment). This app has no Alembic
+        migration setup, so for the few new columns added over time we run
+        idempotent `ADD COLUMN IF NOT EXISTS` statements here instead.
+        Safe to run on every boot — no-ops once the column exists.
+        """
+        from sqlalchemy import text
+        statements = [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_system BOOLEAN DEFAULT FALSE",
+        ]
+        for stmt in statements:
+            try:
+                db.session.execute(text(stmt))
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                # Non-Postgres dialects (e.g. SQLite in tests) don't support
+                # IF NOT EXISTS — ignore, create_all() already handled it
+                # for brand-new databases.
+                app.logger.debug(f"[migration] skipped '{stmt}': {exc}")
+
     @app.before_request
     def _ensure_tables():
         import time
@@ -135,6 +159,7 @@ def create_app(config_object=None):
         for attempt in range(1, 6):
             try:
                 db.create_all()
+                _run_lightweight_migrations()
                 _tables_created["ok"] = True
                 app.logger.info(f"db.create_all() — tables ready (attempt {attempt})")
                 return  # success — let the request continue

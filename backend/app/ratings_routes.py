@@ -13,14 +13,18 @@ Business rules (all enforced here):
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.models import User
 
 ratings_bp = Blueprint("ratings", __name__)
 
 
 def _get_user(user_id):
-    """Fetch a User by id. Returns None if not found."""
+    """Fetch a User by id (JWT identity is a string — cast to int). Returns None if not found."""
     from app.models import User
-    return User.query.get(user_id)
+    try:
+        return User.query.get(int(user_id))
+    except (TypeError, ValueError):
+        return None
 
 
 # ── Submit / Update Rating ────────────────────────────────────────
@@ -255,6 +259,11 @@ def admin_all_ratings():
         query = query.filter(Rating.stars >= min_stars)
 
     ratings = query.order_by(Rating.created_at.desc()).limit(200).all()
+
+    # Batch-load target names for display
+    target_ids = {r.target_id for r in ratings if r.target_id}
+    name_map = {u.id: (u.business_name or u.full_name) for u in User.query.filter(User.id.in_(target_ids)).all()} if target_ids else {}
+
     return jsonify({
         "ratings": [
             {
@@ -262,6 +271,7 @@ def admin_all_ratings():
                 "reviewer_name": r.reviewer_name,
                 "reviewer_id":   r.reviewer_id,
                 "target_id":     r.target_id,
+                "target_name":   name_map.get(r.target_id, "Unknown"),
                 "target_role":   r.target_role,
                 "stars":         r.stars,
                 "comment":       r.comment,

@@ -328,7 +328,32 @@ def list_conversations():
         unread = c.messages.filter_by(is_read=False).filter(Message.sender_id != user.id).count()
         d = c.to_dict()
         d["last_message"] = last_msg.content if last_msg else ""
-        d["unread"] = unread
+
+        # Other participants (excluding self) — frontend uses this to
+        # display the real name/role of who you're chatting with.
+        other_records = ConversationParticipant.query.filter(
+            ConversationParticipant.conversation_id == c.id,
+            ConversationParticipant.user_id != user.id,
+        ).all()
+        participants = []
+        is_admin_broadcast = False
+        for rec in other_records:
+            other = User.query.get(rec.user_id)
+            if not other:
+                continue
+            participants.append({
+                "id": other.id,
+                "full_name": other.full_name,
+                "business_name": other.business_name,
+                "role": other.role,
+                "is_system": bool(other.is_system),
+            })
+            if other.is_system:
+                is_admin_broadcast = True
+
+        d["participants"]     = participants
+        d["unread"]           = unread
+        d["is_admin_broadcast"] = is_admin_broadcast
         results.append(d)
 
     return success_response({"conversations": results})
@@ -560,6 +585,21 @@ def send_message_rest(conv_id):
     ).first()
     if not participant:
         return error_response("Not a participant in this conversation", 403)
+
+    # Block replies to Mech Admin broadcast conversations — these are
+    # one-way notification threads. Only the system account (or a real
+    # admin, for support follow-up) may post into them.
+    if user.role != "admin":
+        other_records = ConversationParticipant.query.filter(
+            ConversationParticipant.conversation_id == conv_id,
+            ConversationParticipant.user_id != user.id,
+        ).all()
+        for rec in other_records:
+            other = User.query.get(rec.user_id)
+            if other and other.is_system:
+                return error_response(
+                    "This is a notification from Mech Admin — replies are not allowed.", 403
+                )
 
     data    = request.get_json(silent=True) or {}
     content = (data.get("message") or data.get("content") or "").strip()

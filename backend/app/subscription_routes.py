@@ -22,8 +22,8 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
 from app import db
-from app.models import User, Subscription, Notification, AdminAction, PLAN_DURATIONS, PLAN_PRICES_KES
-from app.utils import success_response, error_response, current_user, paginate_query
+from app.models import User, Subscription, AdminAction, PLAN_DURATIONS, PLAN_PRICES_KES
+from app.utils import success_response, error_response, current_user, paginate_query, notify_via_chat
 from app.sms_service import send_sms
 
 subscription_bp = Blueprint("subscriptions", __name__)
@@ -35,8 +35,9 @@ def _log_action(admin_id, target_id, action, notes=""):
 
 
 def _notify(user_id, message, notification_type="subscription"):
-    n = Notification(user_id=user_id, message=message, notification_type=notification_type)
-    db.session.add(n)
+    """Creates an in-app Notification AND a Mech Admin chat message
+    (see utils.notify_via_chat for details)."""
+    notify_via_chat(user_id, message, notification_type)
 
 
 # ═══════════════════════════════════════════════════════════════════

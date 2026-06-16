@@ -64,11 +64,19 @@ def role_required(*roles):
 
 
 def current_user():
-    """Return the currently authenticated User model, or None."""
+    """Return the currently authenticated User model, or None.
+
+    JWT identity is stored as a string (create_access_token(identity=str(user.id))).
+    User.id is an Integer primary key — explicitly cast to int here so
+    User.query.get() reliably matches, regardless of dialect/driver
+    type-coercion behaviour. Without this, every @jwt_required() route
+    that calls current_user() (including ALL /api/admin/* endpoints)
+    could silently return None for a valid, logged-in admin.
+    """
     try:
         verify_jwt_in_request()
         user_id = get_jwt_identity()
-        return User.query.get(user_id)
+        return User.query.get(int(user_id))
     except Exception:
         return None
 
@@ -84,6 +92,71 @@ def success_response(data=None, message="", status=200):
 
 def error_response(message, status=400):
     return jsonify({"success": False, "error": message}), status
+
+
+def notify_via_chat(user_id, message, notification_type="admin"):
+    """
+    Creates an in-app Notification AND delivers the same message as a
+    chat message from the "Mech Admin" system account, so it appears
+    in the recipient's chat list with sender "Mech Admin". The
+    conversation is read-only for the recipient (server-side guard in
+    routes.py send_message_rest blocks replies to system accounts).
+
+    Used by:
+      - admin_routes.send_notification (manual admin → user/role/broadcast)
+      - subscription_routes._notify (subscription reminders, lock/grace/etc.)
+
+    Returns the created Message (caller may still need to db.session.commit()).
+    """
+    from app import db, socketio
+    from app.models import Notification, Conversation, ConversationParticipant, Message
+
+    n = Notification(user_id=user_id, message=message, notification_type=notification_type)
+    db.session.add(n)
+
+    bot = User.get_or_create_mech_admin()
+    db.session.flush()
+
+    my_convs    = {p.conversation_id for p in ConversationParticipant.query.filter_by(user_id=bot.id).all()}
+    their_convs = {p.conversation_id for p in ConversationParticipant.query.filter_by(user_id=user_id).all()}
+    shared = my_convs & their_convs
+    if shared:
+        conv_id = sorted(shared)[0]
+    else:
+        conv = Conversation()
+        db.session.add(conv)
+        db.session.flush()
+        db.session.add(ConversationParticipant(conversation_id=conv.id, user_id=bot.id))
+        db.session.add(ConversationParticipant(conversation_id=conv.id, user_id=user_id))
+        conv_id = conv.id
+
+    chat_msg = Message(
+        conversation_id = conv_id,
+        sender_id       = bot.id,
+        content         = message,
+        message_type    = "text",
+    )
+    db.session.add(chat_msg)
+    db.session.flush()
+
+    Conversation.query.get(conv_id).updated_at = datetime.utcnow()
+
+    try:
+        socketio.emit("notification", {"message": message}, room=f"user_{user_id}")
+        socketio.emit("new_message", {
+            "id":              chat_msg.id,
+            "conversation_id": conv_id,
+            "sender_id":       bot.id,
+            "sender_name":     "Mech Admin",
+            "message":         message,
+            "content":         message,
+            "message_type":    "text",
+            "created_at":      chat_msg.created_at.isoformat(),
+        }, room=f"user_{user_id}")
+    except Exception:
+        pass  # socket emit is best-effort; the message is already persisted
+
+    return chat_msg
 
 
 def nearby_providers(role, lat, lng, radius_km=None):

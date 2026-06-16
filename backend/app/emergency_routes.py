@@ -23,6 +23,10 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
+from app import db
+from app.models import EmergencyContact
+from app.utils import success_response, error_response, current_user
+
 try:
     import openpyxl
     OPENPYXL_AVAILABLE = True
@@ -137,13 +141,28 @@ def get_emergency_contacts():
     Returns emergency contacts — no authentication required.
     Emergency information must always be accessible.
 
+    Source priority:
+      1. Admin-editable DB table (EmergencyContact) — if any active rows exist
+      2. Excel sheet (frontend/data/emergency_contacts.xlsx)
+      3. Hardcoded FALLBACK_CONTACTS
+
     Query params (all optional, combinable):
       ?country=Kenya          — filter by country
       ?region=Kirinyaga       — filter by region/county (partial match)
       ?category=Police        — filter by service category
     """
-    contacts = _load_from_excel() or FALLBACK_CONTACTS
-    source   = "excel" if _load_from_excel() else "fallback"
+    db_contacts = EmergencyContact.query.filter_by(is_active=True).order_by(EmergencyContact.name).all()
+    if db_contacts:
+        contacts = [c.to_dict() for c in db_contacts]
+        source = "database"
+    else:
+        excel_contacts = _load_from_excel()
+        if excel_contacts:
+            contacts = excel_contacts
+            source = "excel"
+        else:
+            contacts = FALLBACK_CONTACTS
+            source = "fallback"
 
     # Apply filters
     country  = request.args.get("country",  "").strip().lower()
@@ -153,16 +172,114 @@ def get_emergency_contacts():
     if country:
         contacts = [c for c in contacts if country in c.get("country","").lower()]
     if region:
-        contacts = [c for c in contacts if region in c.get("region","").lower()]
+        contacts = [c for c in contacts if region in (c.get("region") or "").lower()]
     if category:
-        contacts = [c for c in contacts if category in c.get("category","").lower()]
+        contacts = [c for c in contacts if category in (c.get("category") or "").lower()]
 
     return jsonify({
         "contacts": contacts,
         "count":    len(contacts),
         "source":   source,
-        "note":     "This list covers multiple countries and regions. Edit frontend/data/emergency_contacts.xlsx to add more.",
+        "note":     "This list covers multiple countries and regions. "
+                    "Admins can edit it from the dashboard, or via frontend/data/emergency_contacts.xlsx "
+                    "if no database entries exist.",
     }), 200
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ADMIN — Edit emergency contacts (DB-backed)
+# ═══════════════════════════════════════════════════════════════════
+
+def _emergency_admin_guard():
+    user = current_user()
+    if not user or user.role != "admin":
+        return None, error_response("Admin access required", 403)
+    return user, None
+
+
+@emergency_bp.route("/admin/contacts", methods=["GET"])
+@jwt_required()
+def admin_list_contacts():
+    """All emergency contacts the admin can edit (DB only — Excel/fallback
+    rows are read-only and not returned here)."""
+    admin, err = _emergency_admin_guard()
+    if err:
+        return err
+
+    contacts = EmergencyContact.query.order_by(EmergencyContact.name).all()
+    return success_response({
+        "contacts": [c.to_dict() for c in contacts],
+        "count": len(contacts),
+        "note": ("No database contacts yet — the public /contacts endpoint is "
+                 "currently serving from Excel/fallback. Add a contact below to "
+                 "start managing them from here.") if not contacts else None,
+    })
+
+
+@emergency_bp.route("/admin/contacts", methods=["POST"])
+@jwt_required()
+def admin_create_contact():
+    """Body: { name, category, contact, location, icon, notes }"""
+    admin, err = _emergency_admin_guard()
+    if err:
+        return err
+
+    data = request.get_json(force=True) or {}
+    name    = (data.get("name") or "").strip()
+    contact = (data.get("contact") or "").strip()
+    if not name or not contact:
+        return error_response("name and contact are required", 400)
+
+    row = EmergencyContact(
+        name     = name,
+        category = (data.get("category") or "Ambulance").strip(),
+        contact  = contact,
+        location = (data.get("location") or "Kenya").strip(),
+        icon     = (data.get("icon") or "🚨").strip(),
+        notes    = (data.get("notes") or "").strip(),
+        is_active = True,
+        updated_by = admin.id,
+    )
+    db.session.add(row)
+    db.session.commit()
+    return success_response({"contact": row.to_dict(), "message": "Emergency contact added."}, status=201)
+
+
+@emergency_bp.route("/admin/contacts/<int:contact_id>", methods=["PUT", "PATCH"])
+@jwt_required()
+def admin_update_contact(contact_id):
+    """Body: any of { name, category, contact, location, icon, notes, is_active }"""
+    admin, err = _emergency_admin_guard()
+    if err:
+        return err
+
+    row = EmergencyContact.query.get_or_404(contact_id)
+    data = request.get_json(force=True) or {}
+
+    for field in ["name", "category", "contact", "location", "icon", "notes"]:
+        if field in data:
+            setattr(row, field, (data[field] or "").strip())
+    if "is_active" in data:
+        row.is_active = bool(data["is_active"])
+
+    row.updated_by = admin.id
+    row.updated_at = datetime.utcnow()
+    db.session.commit()
+    return success_response({"contact": row.to_dict(), "message": "Emergency contact updated."})
+
+
+@emergency_bp.route("/admin/contacts/<int:contact_id>", methods=["DELETE"])
+@jwt_required()
+def admin_delete_contact(contact_id):
+    admin, err = _emergency_admin_guard()
+    if err:
+        return err
+
+    row = EmergencyContact.query.get_or_404(contact_id)
+    db.session.delete(row)
+    db.session.commit()
+    return success_response({"message": "Emergency contact deleted."})
+
 
 
 @emergency_bp.route("/countries", methods=["GET"])
@@ -188,7 +305,7 @@ def log_emergency_call():
     from app import db
     from app.models import EmergencyCallLog
 
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data    = request.get_json(silent=True) or {}
 
     service_name = data.get("service_name", "").strip()
@@ -225,7 +342,7 @@ def get_emergency_logs():
     from app import db
     from app.models import EmergencyCallLog
 
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     try:
         logs = (
             EmergencyCallLog.query

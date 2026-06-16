@@ -11,7 +11,7 @@ from app.models import (
     User, Conversation, Message, Notification,
     AdminAction, IssueReport, CallLog, Review, Transaction
 )
-from app.utils import success_response, error_response, role_required, current_user, paginate_query
+from app.utils import success_response, error_response, role_required, current_user, paginate_query, notify_via_chat
 from app.sms_service import send_sms
 
 admin_bp = Blueprint("admin", __name__)
@@ -149,15 +149,9 @@ def suspend_user():
     target.is_suspended = True
     target.suspended_until = datetime.utcnow() + timedelta(hours=duration_hours)
 
-    _log_action(admin.id, user_id, "suspend", notes=f"Duration: {duration_hours}h")
-    db.session.commit()
+    notify_via_chat(user_id, f"Your account has been suspended for {duration_hours} hours.", "suspension")
 
-    notif = Notification(
-        user_id=user_id,
-        message=f"Your account has been suspended for {duration_hours} hours.",
-        notification_type="suspension",
-    )
-    db.session.add(notif)
+    _log_action(admin.id, user_id, "suspend", notes=f"Duration: {duration_hours}h")
     db.session.commit()
 
     return success_response({"message": f"User suspended for {duration_hours} hours"})
@@ -183,6 +177,75 @@ def deactivate_user():
     db.session.commit()
 
     return success_response({"message": "User account deactivated"})
+
+
+# ── Toggle Active (re-activate / deactivate) ──────────────────────
+@admin_bp.route("/users/<int:user_id>/toggle-active", methods=["POST"])
+@jwt_required()
+def toggle_user_active(user_id):
+    """Flip is_active. Used by the dashboard Activate/Deactivate button
+    so re-activating a previously-deactivated account actually works
+    (the old /deactivate endpoint could only ever set it to False)."""
+    admin = current_user()
+    if not admin or admin.role != "admin":
+        return error_response("Admin access required", 403)
+
+    target = User.query.get_or_404(user_id)
+    target.is_active = not target.is_active
+
+    _log_action(admin.id, user_id, "activate" if target.is_active else "deactivate")
+    db.session.commit()
+
+    state = "activated" if target.is_active else "deactivated"
+    return success_response({"message": f"{target.full_name}'s account {state}.", "is_active": target.is_active})
+
+
+# ── Lock / Unlock Account ──────────────────────────────────────────
+@admin_bp.route("/users/<int:user_id>/lock", methods=["POST"])
+@jwt_required()
+def lock_account(user_id):
+    """
+    Lock a provider's account (e.g. for an expired subscription that
+    hasn't been handled via the subscriptions flow, or any other
+    reason). Body: { reason }
+    """
+    admin = current_user()
+    if not admin or admin.role != "admin":
+        return error_response("Admin access required", 403)
+
+    target = User.query.get_or_404(user_id)
+    data   = request.get_json(force=True) or {}
+    reason = data.get("reason", "Account locked by admin.")
+
+    target.is_suspended    = True
+    target.suspended_until = None  # indefinite, until admin unlocks
+
+    notify_via_chat(user_id, f"Your account has been locked. Reason: {reason}", "account_locked")
+
+    _log_action(admin.id, user_id, "lock_account", notes=reason)
+    db.session.commit()
+
+    return success_response({"message": f"{target.full_name}'s account locked."})
+
+
+@admin_bp.route("/users/<int:user_id>/unlock", methods=["POST"])
+@jwt_required()
+def unlock_account(user_id):
+    """Unlock a previously-locked account (e.g. after the provider pays)."""
+    admin = current_user()
+    if not admin or admin.role != "admin":
+        return error_response("Admin access required", 403)
+
+    target = User.query.get_or_404(user_id)
+    target.is_suspended    = False
+    target.suspended_until = None
+
+    notify_via_chat(user_id, "Your account has been unlocked. Welcome back!", "account_unlocked")
+
+    _log_action(admin.id, user_id, "unlock_account")
+    db.session.commit()
+
+    return success_response({"message": f"{target.full_name}'s account unlocked."})
 
 
 # ── Admin Update Profile ──────────────────────────────────────────
@@ -252,6 +315,13 @@ def admin_view_conversation(conv_id):
 @admin_bp.route("/notify", methods=["POST"])
 @jwt_required()
 def send_notification():
+    """
+    Send a notification to one user, all users of a role, or everyone.
+    Each notification is ALSO delivered as a chat message from the
+    "Mech Admin" system account, so it appears in the recipient's
+    chat list with sender "Mech Admin". Replies to that conversation
+    are blocked server-side (see send_message_rest in routes.py).
+    """
     admin = current_user()
     if not admin or admin.role != "admin":
         return error_response("Admin access required", 403)
@@ -265,8 +335,6 @@ def send_notification():
     if not message:
         return error_response("Message is required")
 
-    from app import socketio
-
     recipients = []
     if broadcast:
         recipients = User.query.filter(User.role != "admin", User.is_active == True).all()
@@ -277,13 +345,18 @@ def send_notification():
         if u:
             recipients = [u]
 
-    for u in recipients:
-        notif = Notification(user_id=u.id, message=message, notification_type="admin")
-        db.session.add(notif)
-        socketio.emit("notification", {"message": message}, room=f"user_{u.id}")
+    if not recipients:
+        return error_response("No matching recipients found", 404)
 
+    for u in recipients:
+        notify_via_chat(u.id, message, "admin")
+
+    _log_action(admin.id, None, "send_notification",
+                notes=f"\"{message[:80]}\" → {len(recipients)} recipient(s) "
+                      f"({'broadcast' if broadcast else role or target_email})")
     db.session.commit()
     return success_response({"message": f"Notification sent to {len(recipients)} user(s)"})
+
 
 
 # ── System Status ─────────────────────────────────────────────────
@@ -314,10 +387,15 @@ def system_status():
     return success_response({"statuses": statuses})
 
 
-# ── Admin Actions History ─────────────────────────────────────────
+# ── Admin Actions History (Audit Trail) ────────────────────────────
 @admin_bp.route("/actions", methods=["GET"])
 @jwt_required()
 def list_actions():
+    """
+    Audit trail of admin actions. Each entry shows WHICH admin
+    performed the action and on WHICH user, so multiple admins can
+    see each other's changes.
+    """
     admin = current_user()
     if not admin or admin.role != "admin":
         return error_response("Admin access required", 403)
@@ -325,11 +403,21 @@ def list_actions():
     page = int(request.args.get("page", 1))
     q = AdminAction.query.order_by(AdminAction.created_at.desc())
     result = paginate_query(q, page)
+
+    # Batch-load admin/target names to avoid N+1 queries
+    user_ids = set()
+    for a in result["items"]:
+        if a.admin_id: user_ids.add(a.admin_id)
+        if a.target_user_id: user_ids.add(a.target_user_id)
+    name_map = {u.id: u.full_name for u in User.query.filter(User.id.in_(user_ids)).all()} if user_ids else {}
+
     actions = [
         {
             "id": a.id,
             "admin_id": a.admin_id,
+            "admin_name": name_map.get(a.admin_id, "Unknown admin"),
             "target_user_id": a.target_user_id,
+            "target_name": name_map.get(a.target_user_id) if a.target_user_id else None,
             "action": a.action,
             "notes": a.notes,
             "created_at": a.created_at.isoformat(),
@@ -431,7 +519,7 @@ def list_admins():
     if not admin or admin.role != "admin":
         return error_response("Admin access required", 403)
 
-    admins = User.query.filter_by(role="admin").order_by(User.created_at).all()
+    admins = User.query.filter_by(role="admin", is_system=False).order_by(User.created_at).all()
     return success_response({"admins": [a.to_dict() for a in admins]})
 
 
@@ -454,6 +542,8 @@ def remove_admin(target_id):
     target = User.query.get_or_404(target_id)
     if target.role != "admin":
         return error_response("That user is not an admin", 400)
+    if target.is_system:
+        return error_response("Cannot modify the Mech Admin system account", 400)
 
     # Demote to driver — keeps the account intact, just strips admin access
     target.role = "driver"
