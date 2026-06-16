@@ -39,8 +39,12 @@ const Auth = {
   },
   logout() {
     ['mech_token','mech_user','mech_role'].forEach(k => Storage.remove(k));
-    if (State.socket) State.socket.disconnect();
-    window.location.href = 'index.html';
+    if (State.socket) {
+      try { State.socket.disconnect(); } catch (e) { /* ignore */ }
+    }
+    // replace() instead of href — avoids leaving the authenticated page
+    // in browser history (back button would otherwise show stale data)
+    window.location.replace('index.html');
   },
   isLoggedIn() { return !!State.token; },
   headers() {
@@ -645,8 +649,10 @@ const Pages = {
     set('statDrivers',      res.drivers        ?? '--');
     set('statMechanics',    res.mechanics      ?? '--');
     set('statShops',        res.spare_shops    ?? '--');
-    set('statActiveToday',  res.active_today   ?? '--');
-    set('statPendingVerify',res.pending_verify ?? '--');
+    set('statAvgRating',    res.avg_rating     ?? '--');
+    set('statEarnings',     res.total_earnings_kes != null ? `KES ${Number(res.total_earnings_kes).toLocaleString()}` : '--');
+    set('statPendingMech',  res.pending_mechanic_verifications ?? '--');
+    set('statPendingShop',  res.pending_shop_verifications ?? '--');
   },
 
   async _loadAdminUsers(q='') {
@@ -666,13 +672,30 @@ const Pages = {
         <div style="flex:1;min-width:0;">
           <div style="font-size:0.85rem;font-weight:800;">${UI.escapeHtml(u.full_name||'')}</div>
           <div style="font-size:0.72rem;color:#6b7280;">${UI.escapeHtml(u.email||'')} · ${u.role}</div>
-          <div style="font-size:0.68rem;color:${u.is_active?'#16a34a':'#ef4444'};">${u.is_active?'Active':'Inactive'} · ${u.is_verified?'Verified':'Unverified'}</div>
+          <div style="font-size:0.68rem;color:${u.is_active?'#16a34a':'#ef4444'};">${u.is_active?'Active':'Inactive'} · ${u.is_verified?'Verified':'Unverified'}${u.is_suspended?' · <span style=\"color:#ef4444;font-weight:700;\">🔒 Locked</span>':''}</div>
         </div>
-        <div style="display:flex;gap:4px;flex-shrink:0;">
+        <div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;max-width:120px;">
           ${!u.is_verified?`<button onclick="Pages._verifyUser(${u.id},true,this)" style="padding:4px 8px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:0.7rem;cursor:pointer;">✓ Verify</button>`:''}
           <button onclick="Pages._toggleUserActive(${u.id},${u.is_active},this)" style="padding:4px 8px;background:${u.is_active?'#ef4444':'#6b7280'};color:#fff;border:none;border-radius:6px;font-size:0.7rem;cursor:pointer;">${u.is_active?'Deactivate':'Activate'}</button>
+          ${u.is_suspended
+            ? `<button onclick="Pages._unlockUser(${u.id},this)" style="padding:4px 8px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:0.7rem;cursor:pointer;">🔓 Unlock</button>`
+            : `<button onclick="Pages._lockUser(${u.id},this)" style="padding:4px 8px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:0.7rem;cursor:pointer;">🔒 Lock</button>`}
         </div>
       </div>`).join('');
+  },
+
+  async _lockUser(userId, btn) {
+    const reason = prompt('Reason for locking this account:', 'Outstanding subscription payment.');
+    if (reason === null) return;
+    const res = await API.post(`/api/admin/users/${userId}/lock`, { reason });
+    UI.showToast(res.message || 'Done');
+    Pages._loadAdminUsers();
+  },
+
+  async _unlockUser(userId, btn) {
+    const res = await API.post(`/api/admin/users/${userId}/unlock`, {});
+    UI.showToast(res.message || 'Done');
+    Pages._loadAdminUsers();
   },
 
   async _verifyUser(userId, approved, btn) {
@@ -682,7 +705,7 @@ const Pages = {
   },
 
   async _toggleUserActive(userId, currentlyActive, btn) {
-    const res = await API.post('/api/admin/deactivate', { user_id: userId });
+    const res = await API.post(`/api/admin/users/${userId}/toggle-active`, {});
     UI.showToast(res.message || 'Done');
     Pages._loadAdminUsers();
   },
@@ -732,11 +755,13 @@ const Pages = {
     // Send notification
     document.getElementById('sendNotifBtn')?.addEventListener('click', async () => {
       const msg  = document.getElementById('notifMessage')?.value.trim();
-      const target = document.getElementById('notifTarget')?.value;
+      const target = document.getElementById('notifTarget')?.value.trim();
       const role = document.getElementById('notifRole')?.value;
+      const broadcast = document.querySelector('input[name="broadcast"]')?.checked;
       if (!msg) { UI.showToast('Enter notification message'); return; }
-      const res = await API.post('/api/admin/notify', { message: msg, target, role });
-      UI.showToast(res.message || '✅ Notification sent!');
+      const res = await API.post('/api/admin/notify', { message: msg, target, role, broadcast });
+      UI.showToast(res.message || res.error || '✅ Notification sent!');
+      if (!res.error) document.getElementById('notifMessage').value = '';
     });
   },
 
@@ -950,7 +975,14 @@ const Pages = {
   _initLogout() {
     document.querySelectorAll('[data-logout], #logoutBtn').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (confirm('Log out?')) Auth.logout();
+        // Some installed PWA / mobile webview contexts stub out confirm()
+        // to silently return undefined (no dialog shown) instead of
+        // throwing or returning a real boolean. Only treat an EXPLICIT
+        // `false` return as "user cancelled" — anything else (true,
+        // undefined, thrown error) proceeds with logout.
+        let result;
+        try { result = confirm('Log out?'); } catch (e) { result = true; }
+        if (result !== false) Auth.logout();
       });
     });
   },
